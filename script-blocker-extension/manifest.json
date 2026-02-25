@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "脚本拦截器 Pro",
   "version": "1.1.0",
-  "description": "在特定网址拦截包含特定关键词的脚本标签，支持通配符和多网站匹配",
+  "description": "可在特定网址拦截包含特定关键词的脚本标签，支持通配符和多网站匹配",
   "permissions": [
     "storage",
     "scripting",
