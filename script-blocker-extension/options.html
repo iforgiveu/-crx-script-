@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>脚本拦截器 - 设置</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        h1 {
+            color: #1a1a1a;
+            margin-top: 0;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #4CAF50;
+            font-size: 24px;
+        }
+        h1 span {
+            background: #4CAF50;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        h3 {
+            color: #333;
+            margin: 20px 0 15px 0;
+            font-size: 18px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e1e4e8;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+        }
+        input[type="text"]:focus, select:focus, textarea:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            background: #eef2f7;
+            padding: 8px 12px;
+            border-radius: 4px;
+            line-height: 1.6;
+        }
+        .help-text i {
+            color: #4CAF50;
+            font-style: normal;
+            font-weight: bold;
+        }
+        .help-text code {
+            background: #d4d4d4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #c7254e;
+        }
+        .checkbox-group {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .checkbox-group label {
+            display: inline;
+            margin-left: 8px;
+            font-weight: normal;
+        }
+        .button-group {
+            margin: 25px 0;
+            display: flex;
+            gap: 12px;
+        }
+        .btn-save {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.3s;
+            flex: 1;
+        }
+        .btn-save:hover {
+            background: #45a049;
+        }
+        .btn-cancel {
+            background: #95a5a6;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .btn-cancel:hover {
+            background: #7f8c8d;
+        }
+        .editing-indicator {
+            background: #e3f2fd;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 5px solid #2196F3;
+            font-weight: bold;
+            color: #1565c0;
+        }
+        .rule-list {
+            margin-top: 30px;
+            border-top: 2px dashed #ddd;
+            padding-top: 20px;
+        }
+        .rule-item {
+            background: white;
+            border: 1px solid #e1e4e8;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .rule-item:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-color: #4CAF50;
+        }
+        .rule-item.disabled {
+            opacity: 0.7;
+            background: #f8f9fa;
+            border-left: 5px solid #95a5a6;
+        }
+        .rule-item.enabled {
+            border-left: 5px solid #4CAF50;
+        }
+        .rule-info {
+            flex: 1;
+        }
+        .rule-name {
+            font-size: 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .rule-name strong {
+            color: #2c3e50;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: normal;
+        }
+        .status-active {
+            background: #4CAF50;
+            color: white;
+        }
+        .status-inactive {
+            background: #95a5a6;
+            color: white;
+        }
+        .rule-site {
+            color: #34495e;
+            margin-bottom: 5px;
+            font-size: 13px;
+            background: #f1f8ff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .rule-keywords {
+            color: #e74c3c;
+            font-size: 13px;
+            background: #fef5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .rule-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .rule-actions button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        .btn-toggle {
+            background: #FF9800;
+            color: white;
+        }
+        .btn-toggle:hover {
+            background: #f57c00;
+        }
+        .btn-edit {
+            background: #2196F3;
+            color: white;
+        }
+        .btn-edit:hover {
+            background: #1976D2;
+        }
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+        .btn-delete:hover {
+            background: #d32f2f;
+        }
+        .example-box {
+            background: #fff3e0;
+            border-left: 5px solid #FF9800;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 13px;
+        }
+        .example-box strong {
+            color: #e65100;
+        }
+        .example-box code {
+            background: #fff;
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: #e65100;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            🔒 脚本拦截器 Pro 
+            <span>v1.1</span>
+        </h1>
+        
+        <div class="example-box">
+            <strong>📌 使用示例：</strong><br>
+            • <code>*yh*</code> - 匹配所有包含 "yh" 的网站，如 https://yhmana.cc/<br>
+            • <code>*.bili*.com</code> - 匹配 bilibili.com, bili22.com 等<br>
+            • <code>zhihu.com, *.baidu.*</code> - 一行写多个，用逗号分隔<br>
+            • <code>__CF$cv$params</code> - 拦截 Cloudflare 检测脚本
+        </div>
+
+        <div id="editingIndicator" class="editing-indicator" style="display: none;">
+            ✏️ 正在编辑规则
+        </div>
+
+        <h3>➕ 添加/编辑规则</h3>
+        
+        <div class="form-group">
+            <label>📝 规则名称:</label>
+            <input type="text" id="ruleName" placeholder="例如: 拦截 yhmana 广告">
+        </div>
+
+        <div class="form-group">
+            <label>🌐 网站匹配方式:</label>
+            <select id="matchType">
+                <option value="simple" selected>简单通配符 - 支持 * 号 (推荐)</option>
+                <option value="contains">包含匹配 - 只要网址包含关键词</option>
+                <option value="regex">正则表达式 - 高级模式</option>
+            </select>
+            <div class="help-text">
+                <i>✨ 简单通配符示例：</i> <code>*yh*</code> 可匹配 https://yhmana.cc/、http://www.yh.com/<br>
+                <i>📌 包含匹配示例：</i> <code>yhmana</code> 可匹配任何包含 yhmana 的网址<br>
+                <i>⚡ 正则示例：</i> <code>^https?://(www\.)?yhmana\.cc/.*$</code>
+            </div>
+        </div>
+
+        <div class="form-group" id="sitePatternGroup">
+            <label>📌 网站模式 (每行一个，支持 * 通配符):</label>
+            <textarea id="sitePatterns" rows="4" placeholder="例如: 
+*yh*
+*.bili*.com
+zhihu.com
+*.baidu.*
+https://*.google.*/*"></textarea>
+            <div class="help-text">
+                <i>💡 每行一个网站模式，支持 * 通配符</i><br>
+                <i>💡 也可以一行写多个，用逗号分隔：</i> <code>*yh*, *.bili*, zhihu.com</code>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>🔑 要拦截的关键词 (每行一个):</label>
+            <textarea id="keywords" rows="4" placeholder="例如: 
+__CF$cv$params
+new Function(
+var style=&quot;position:fixed; bottom
+adsbygoogle
+cloudflare"></textarea>
+            <div class="help-text">
+                <i>💡 脚本内容或 src 中包含这些关键词时会被拦截</i>
+            </div>
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="enabled" checked>
+            <label for="enabled">✅ 启用这条规则</label>
+        </div>
+
+        <div class="button-group">
+            <button id="saveRuleBtn" class="btn-save">💾 保存规则</button>
+            <button id="cancelEditBtn" class="btn-cancel" style="display: none;">❌ 取消编辑</button>
+        </div>
+
+        <div class="rule-list">
+            <h3>📋 现有规则列表</h3>
+            <div id="rulesList">
+                <!-- 规则会动态显示在这里 -->
+            </div>
+        </div>
+
+        <div class="footer">
+            ⚡ 规则保存后立即生效 | 🚫 支持通配符 * | 📍 一条规则可匹配多个网站
+        </div>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>
