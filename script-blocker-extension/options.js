@@ -1,5 +1,21 @@
 // options.js
 document.addEventListener('DOMContentLoaded', function() {
+    // ==================== 标签页切换 ====================
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            this.classList.add('active');
+            const tabId = 'tab-' + this.dataset.tab;
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
+    
+    // ==================== 规则管理 ====================
     const ruleNameInput = document.getElementById('ruleName');
     const matchTypeSelect = document.getElementById('matchType');
     const sitePatternsInput = document.getElementById('sitePatterns');
@@ -13,49 +29,35 @@ document.addEventListener('DOMContentLoaded', function() {
     let rules = [];
     let editingIndex = -1;
 
+    // 监听匹配类型变化
+    matchTypeSelect.addEventListener('change', function() {
+        if (this.value === '*') {
+            sitePatternsInput.value = '*';
+        }
+    });
+
     // 加载规则
     function loadRules() {
         chrome.storage.local.get(['scriptBlockerRules'], function(result) {
             let loadedRules = result.scriptBlockerRules || [];
             
-            // 迁移旧规则到新格式
             rules = loadedRules.map((rule, index) => {
-                // 确保有 name
                 if (!rule.name) rule.name = `规则 ${index + 1}`;
-                
-                // 确保有 matchType
                 if (!rule.matchType) rule.matchType = 'simple';
-                
-                // 转换旧的 sitePattern 到 sitePatterns
                 if (rule.sitePattern && !rule.sitePatterns) {
                     rule.sitePatterns = [rule.sitePattern];
                     delete rule.sitePattern;
                 }
-                
-                // 确保 sitePatterns 是数组
                 if (!rule.sitePatterns) rule.sitePatterns = ['*'];
-                
-                // 确保 keywords 是数组
                 if (!rule.keywords) rule.keywords = [];
-                
                 return rule;
             });
             
-            // 如果有更新，保存回去
             if (JSON.stringify(loadedRules) !== JSON.stringify(rules)) {
                 saveRules();
             }
             
             displayRules();
-            
-            // 检查是否有正在编辑的规则
-            chrome.storage.local.get(['editingRule'], function(editResult) {
-                if (editResult.editingRule) {
-                    const { index, rule } = editResult.editingRule;
-                    editRule(index, rule);
-                    chrome.storage.local.remove('editingRule');
-                }
-            });
         });
     }
 
@@ -72,42 +74,29 @@ document.addEventListener('DOMContentLoaded', function() {
             const sitePatterns = rule.sitePatterns || [];
             const keywords = rule.keywords || [];
             
-            // 格式化显示网站模式
-            let siteDisplay = '';
-            if (sitePatterns.length === 0) {
-                siteDisplay = '未设置';
-            } else if (sitePatterns.length === 1) {
-                siteDisplay = sitePatterns[0];
-            } else {
-                siteDisplay = sitePatterns.length + ' 个模式';
-            }
+            let siteDisplay = sitePatterns.length === 0 ? '未设置' : 
+                (sitePatterns.length === 1 ? sitePatterns[0] : sitePatterns.length + ' 个网址');
             
-            // 匹配方式图标
-            let matchIcon = '🔍';
-            if (matchType === 'simple') matchIcon = '✨';
-            else if (matchType === 'contains') matchIcon = '📌';
-            else if (matchType === 'regex') matchIcon = '⚡';
+            let matchIcon = matchType === 'simple' ? '✨' : (matchType === 'contains' ? '📌' : '⚡');
+            let matchText = matchType === 'simple' ? '匹配' : (matchType === 'contains' ? '包含' : '正则');
             
-            // 匹配方式文字
-            let matchText = '';
-            if (matchType === 'simple') matchText = '通配';
-            else if (matchType === 'contains') matchText = '包含';
-            else if (matchType === 'regex') matchText = '正则';
+            let keywordsDisplay = keywords.length === 0 ? '无关键词' : 
+                keywords.slice(0, 3).join('、') + (keywords.length > 3 ? ` 等${keywords.length}个` : '');
             
             html += `
                 <div class="rule-item ${rule.enabled ? 'enabled' : 'disabled'}" data-index="${index}">
                     <div class="rule-info">
                         <div class="rule-name">
-                            <strong>${rule.name || '未命名规则'}</strong>
+                            <strong>${escapeHtml(rule.name)}</strong>
                             <span class="status-badge ${rule.enabled ? 'status-active' : 'status-inactive'}">
                                 ${rule.enabled ? '启用' : '禁用'}
                             </span>
                         </div>
-                        <div class="rule-site">
-                            ${matchIcon} ${matchText}: ${siteDisplay}
+                        <div class="rule-site" title="${escapeHtml(sitePatterns.join('\n'))}">
+                            ${matchIcon} ${matchText} ${escapeHtml(siteDisplay)}
                         </div>
-                        <div class="rule-keywords" title="${keywords.join(', ')}">
-                            🔑 ${keywords.length} 个关键词: ${keywords.join(', ').substring(0, 50)}${keywords.join(', ').length > 50 ? '...' : ''}
+                        <div class="rule-keywords" title="${escapeHtml(keywords.join('\n'))}">
+                            🔑 ${escapeHtml(keywordsDisplay)}
                         </div>
                     </div>
                     <div class="rule-actions">
@@ -120,50 +109,46 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         rulesListDiv.innerHTML = html;
+        bindRuleEvents();
+    }
 
-        // 添加事件监听
+    function bindRuleEvents() {
         document.querySelectorAll('.btn-toggle').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
                 const index = this.dataset.index;
                 toggleRule(parseInt(index));
             });
         });
 
         document.querySelectorAll('.btn-edit').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
                 const index = this.dataset.index;
                 editRule(parseInt(index), rules[parseInt(index)]);
             });
         });
 
         document.querySelectorAll('.btn-delete').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
                 const index = this.dataset.index;
                 deleteRule(parseInt(index));
             });
         });
     }
 
-    // 切换规则状态
     function toggleRule(index) {
         rules[index].enabled = !rules[index].enabled;
         saveRules();
     }
 
-    // 编辑规则
     function editRule(index, rule) {
         editingIndex = index;
         
         ruleNameInput.value = rule.name || '';
         matchTypeSelect.value = rule.matchType || 'simple';
-        
-        // 将 sitePatterns 数组转换为文本
-        if (rule.sitePatterns && rule.sitePatterns.length > 0) {
-            sitePatternsInput.value = rule.sitePatterns.join('\n');
-        } else {
-            sitePatternsInput.value = '';
-        }
-        
+        sitePatternsInput.value = (rule.sitePatterns || []).join('\n');
         keywordsTextarea.value = (rule.keywords || []).join('\n');
         enabledCheckbox.checked = rule.enabled !== false;
         
@@ -171,21 +156,18 @@ document.addEventListener('DOMContentLoaded', function() {
         editingIndicator.textContent = `✏️ 正在编辑: ${rule.name || '未命名规则'}`;
         cancelEditBtn.style.display = 'inline-block';
         saveRuleBtn.textContent = '更新规则';
+        
+        document.querySelector('.tab[data-tab="rules"]').click();
     }
 
-    // 删除规则
     function deleteRule(index) {
         if (confirm('确定要删除这条规则吗？')) {
             rules.splice(index, 1);
             saveRules();
-            
-            if (editingIndex === index) {
-                cancelEdit();
-            }
+            if (editingIndex === index) cancelEdit();
         }
     }
 
-    // 取消编辑
     function cancelEdit() {
         editingIndex = -1;
         ruleNameInput.value = '';
@@ -198,38 +180,19 @@ document.addEventListener('DOMContentLoaded', function() {
         saveRuleBtn.textContent = '保存规则';
     }
 
-    // 保存当前表单为规则
     function saveCurrentRule() {
         const name = ruleNameInput.value.trim();
-        if (!name) {
-            alert('请输入规则名称');
-            return;
-        }
+        if (!name) { alert('请输入规则名称'); return; }
         
         const matchType = matchTypeSelect.value;
         const sitePatternsText = sitePatternsInput.value.trim();
         const keywordsText = keywordsTextarea.value.trim();
         
-        if (!sitePatternsText) {
-            alert('请至少输入一个网站模式');
-            return;
-        }
-        
-        if (!keywordsText) {
-            alert('请至少输入一个关键词');
-            return;
-        }
+        if (!sitePatternsText) { alert('请至少输入一个网站模式'); return; }
+        if (!keywordsText) { alert('请至少输入一个关键词'); return; }
 
-        // 处理网站模式（支持换行和逗号分隔）
-        const sitePatterns = sitePatternsText
-            .split(/[\n,]+/)
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
-
-        // 处理关键词
-        const keywords = keywordsText.split('\n')
-            .map(k => k.trim())
-            .filter(k => k.length > 0);
+        const sitePatterns = sitePatternsText.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+        const keywords = keywordsText.split('\n').map(k => k.trim()).filter(k => k.length > 0);
 
         const newRule = {
             name: name,
@@ -240,28 +203,173 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         if (editingIndex >= 0) {
-            // 更新现有规则
             rules[editingIndex] = newRule;
             cancelEdit();
         } else {
-            // 添加新规则
             rules.push(newRule);
         }
 
         saveRules();
     }
 
-    // 保存规则到 storage
     function saveRules() {
-        chrome.storage.local.set({ scriptBlockerRules: rules }, function() {
-            displayRules();
+        chrome.storage.local.set({ scriptBlockerRules: rules }, displayRules);
+    }
+
+    // ==================== 白名单管理====================
+    
+    // 加载白名单
+    function loadWhitelists() {
+        chrome.storage.local.get(['globalWhitelist', 'secondaryWhitelist'], function(result) {
+            displayWhitelist('global', result.globalWhitelist || []);
+            displayWhitelist('secondary', result.secondaryWhitelist || []);
         });
     }
 
-    // 事件监听
+    // 显示白名单列表
+    function displayWhitelist(type, list) {
+        const container = document.getElementById(type + 'WhitelistList');
+        if (!container) return;
+        
+        let html = '';
+        
+        list.forEach((item, index) => {
+            html += `
+                <div class="whitelist-item" data-type="${type}" data-index="${index}">
+                    <span class="pattern">${escapeHtml(item)}</span>
+                    <div class="actions">
+                        <button class="edit-whitelist" data-type="${type}" data-index="${index}" data-value="${escapeHtml(item)}">✏️</button>
+                        <button class="delete-whitelist" data-type="${type}" data-index="${index}">🗑️</button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        if (list.length === 0) {
+            html = '<div class="empty">暂无白名单规则</div>';
+        }
+        
+        container.innerHTML = html;
+        bindWhitelistEvents();
+    }
+
+    // 绑定白名单事件
+    function bindWhitelistEvents() {
+        // 删除事件
+        document.querySelectorAll('.delete-whitelist').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const type = this.dataset.type;
+                const index = parseInt(this.dataset.index);
+                deleteWhitelistItem(type, index);
+            });
+        });
+
+        // 编辑事件
+        document.querySelectorAll('.edit-whitelist').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const type = this.dataset.type;
+                const index = parseInt(this.dataset.index);
+                const oldValue = this.dataset.value;
+                editWhitelistItem(type, index, oldValue);
+            });
+        });
+    }
+
+    // 删除白名单项
+    function deleteWhitelistItem(type, index) {
+        if (!confirm('确定要删除这条白名单规则吗？')) return;
+        
+        const key = type === 'global' ? 'globalWhitelist' : 'secondaryWhitelist';
+        
+        chrome.storage.local.get([key], function(result) {
+            const list = result[key] || [];
+            list.splice(index, 1);
+            
+            chrome.storage.local.set({ [key]: list }, function() {
+                loadWhitelists();
+            });
+        });
+    }
+
+    // 编辑白名单项
+    function editWhitelistItem(type, index, oldValue) {
+        const newValue = prompt('编辑白名单规则:', oldValue);
+        if (newValue === null || newValue.trim() === '') return;
+        
+        const key = type === 'global' ? 'globalWhitelist' : 'secondaryWhitelist';
+        
+        chrome.storage.local.get([key], function(result) {
+            const list = result[key] || [];
+            list[index] = newValue.trim();
+            
+            chrome.storage.local.set({ [key]: list }, function() {
+                loadWhitelists();
+            });
+        });
+    }
+
+    // 添加白名单项
+    function addWhitelistItem(type) {
+        const inputId = type === 'global' ? 'newGlobalPattern' : 'newSecondaryPattern';
+        const input = document.getElementById(inputId);
+        const pattern = input.value.trim();
+        
+        if (!pattern) {
+            alert('请输入白名单规则');
+            return;
+        }
+        
+        const key = type === 'global' ? 'globalWhitelist' : 'secondaryWhitelist';
+        
+        chrome.storage.local.get([key], function(result) {
+            const list = result[key] || [];
+            
+            if (list.includes(pattern)) {
+                alert('该规则已存在');
+                return;
+            }
+            
+            list.push(pattern);
+            
+            chrome.storage.local.set({ [key]: list }, function() {
+                input.value = '';
+                loadWhitelists();
+            });
+        });
+    }
+
+    // HTML转义
+    function escapeHtml(text) {
+        return String(text).replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                          .replace(/"/g, '&quot;')
+                          .replace(/'/g, '&#039;');
+    }
+
+    // ==================== 事件绑定 ====================
     saveRuleBtn.addEventListener('click', saveCurrentRule);
     cancelEditBtn.addEventListener('click', cancelEdit);
+    
+    document.getElementById('addGlobalBtn').addEventListener('click', function() {
+        addWhitelistItem('global');
+    });
+    
+    document.getElementById('addSecondaryBtn').addEventListener('click', function() {
+        addWhitelistItem('secondary');
+    });
+    
+    document.getElementById('newGlobalPattern').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') addWhitelistItem('global');
+    });
+    
+    document.getElementById('newSecondaryPattern').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') addWhitelistItem('secondary');
+    });
 
     // 初始化加载
     loadRules();
+    loadWhitelists();
 });

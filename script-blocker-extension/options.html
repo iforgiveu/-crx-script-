@@ -6,7 +6,7 @@
     <style>
         body {
             font-family: 'Microsoft YaHei', Arial, sans-serif;
-            max-width: 900px;
+            max-width: 1400px;
             margin: 20px auto;
             padding: 20px;
             background: #f0f2f5;
@@ -32,16 +32,77 @@
             font-size: 14px;
             margin-left: 10px;
         }
-        h3 {
-            color: #333;
-            margin: 20px 0 15px 0;
+        
+        /* ==================== 标签页样式 ==================== */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e1e4e8;
+            margin-bottom: 25px;
+            gap: 5px;
+        }
+        .tab {
+            padding: 12px 25px;
+            background: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.3s;
+            font-size: 16px;
+        }
+        .tab:hover {
+            background: #e9ecef;
+        }
+        .tab.active {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px 0;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* ==================== 两栏布局 ==================== */
+        .two-column {
+            display: flex;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        .column-left {
+            flex: 1;
+            min-width: 400px;
+        }
+        .column-right {
+            flex: 1;
+            min-width: 400px;
+        }
+        
+        /* ==================== 编辑区域样式 ==================== */
+        .edit-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+        .edit-section h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #2c3e50;
             font-size: 18px;
+            border-left: 5px solid #4CAF50;
+            padding-left: 15px;
         }
         .form-group {
             margin-bottom: 20px;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
         }
         label {
             display: block;
@@ -52,10 +113,10 @@
         }
         input[type="text"], select, textarea {
             width: 100%;
-            padding: 10px 12px;
+            padding: 12px 15px;
             border: 2px solid #e1e4e8;
-            border-radius: 6px;
-            font-size: 14px;
+            border-radius: 8px;
+            font-size: 15px;
             box-sizing: border-box;
             transition: border-color 0.3s;
             font-family: 'Microsoft YaHei', Arial, sans-serif;
@@ -65,7 +126,7 @@
             outline: none;
         }
         textarea {
-            height: 100px;
+            height: 150px;
             resize: vertical;
         }
         .help-text {
@@ -73,48 +134,37 @@
             color: #666;
             margin-top: 8px;
             background: #eef2f7;
-            padding: 8px 12px;
-            border-radius: 4px;
+            padding: 10px 15px;
+            border-radius: 6px;
             line-height: 1.6;
         }
-        .help-text i {
-            color: #4CAF50;
-            font-style: normal;
-            font-weight: bold;
-        }
-        .help-text code {
-            background: #d4d4d4;
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: #c7254e;
-        }
         .checkbox-group {
-            background: #f8f9fa;
+            margin: 20px 0;
             padding: 15px;
+            background: #fff;
             border-radius: 8px;
-            margin-bottom: 20px;
         }
         .checkbox-group label {
             display: inline;
-            margin-left: 8px;
+            margin-left: 10px;
             font-weight: normal;
         }
         .button-group {
-            margin: 25px 0;
             display: flex;
             gap: 12px;
+            margin-top: 25px;
         }
         .btn-save {
             background: #4CAF50;
             color: white;
-            padding: 12px 30px;
+            padding: 14px 30px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
             font-weight: bold;
             transition: background 0.3s;
-            flex: 1;
+            flex: 2;
         }
         .btn-save:hover {
             background: #45a049;
@@ -122,40 +172,54 @@
         .btn-cancel {
             background: #95a5a6;
             color: white;
-            padding: 12px 30px;
+            padding: 14px 30px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
             font-weight: bold;
             transition: background 0.3s;
+            flex: 1;
         }
         .btn-cancel:hover {
             background: #7f8c8d;
         }
         .editing-indicator {
             background: #e3f2fd;
-            padding: 12px 18px;
+            padding: 15px 20px;
             border-radius: 8px;
             margin-bottom: 20px;
             border-left: 5px solid #2196F3;
             font-weight: bold;
             color: #1565c0;
+            font-size: 15px;
         }
-        .rule-list {
-            margin-top: 30px;
-            border-top: 2px dashed #ddd;
-            padding-top: 20px;
+        
+        /* ==================== 列表区域样式 ==================== */
+        .list-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+        }
+        .list-section h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            font-size: 18px;
+            border-left: 5px solid #4CAF50;
+            padding-left: 15px;
+        }
+        .rule-list, .whitelist-list {
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 10px;
         }
         .rule-item {
             background: white;
             border: 1px solid #e1e4e8;
-            padding: 16px;
-            margin-bottom: 12px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 18px;
+            margin-bottom: 15px;
+            border-radius: 10px;
             transition: all 0.3s;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
@@ -172,21 +236,22 @@
             border-left: 5px solid #4CAF50;
         }
         .rule-info {
-            flex: 1;
+            margin-bottom: 15px;
         }
         .rule-name {
             font-size: 16px;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
         .rule-name strong {
             color: #2c3e50;
+            font-size: 16px;
         }
         .status-badge {
             display: inline-block;
-            padding: 3px 10px;
+            padding: 4px 12px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: normal;
@@ -201,35 +266,33 @@
         }
         .rule-site {
             color: #34495e;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-size: 13px;
             background: #f1f8ff;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 6px 10px;
+            border-radius: 6px;
             display: inline-block;
         }
         .rule-keywords {
             color: #e74c3c;
             font-size: 13px;
             background: #fef5f5;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            max-width: 400px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            padding: 6px 10px;
+            border-radius: 6px;
+            word-break: break-all;
+            line-height: 1.5;
         }
         .rule-actions {
             display: flex;
             gap: 8px;
+            justify-content: flex-end;
         }
         .rule-actions button {
-            padding: 6px 12px;
+            padding: 8px 16px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 13px;
             transition: all 0.3s;
             font-weight: bold;
         }
@@ -254,26 +317,115 @@
         .btn-delete:hover {
             background: #d32f2f;
         }
-        .example-box {
-            background: #fff3e0;
-            border-left: 5px solid #FF9800;
-            padding: 15px;
+        
+        /* ==================== 白名单样式 ==================== */
+        .whitelist-section {
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .whitelist-section h4 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+        }
+        .badge {
+            background: #6c757d;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: normal;
+        }
+        .badge.global {
+            background: #dc3545;
+        }
+        .badge.secondary {
+            background: #fd7e14;
+        }
+        .whitelist-item {
+            background: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            padding: 12px 15px;
+            margin-bottom: 8px;
             border-radius: 8px;
-            margin: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .whitelist-item:hover {
+            border-color: #4CAF50;
+        }
+        .whitelist-item .pattern {
+            font-family: monospace;
+            font-size: 14px;
+            color: #2c3e50;
+        }
+        .whitelist-item .actions {
+            display: flex;
+            gap: 8px;
+        }
+        .whitelist-item .actions button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .whitelist-item .edit {
+            background: #2196F3;
+            color: white;
+        }
+        .whitelist-item .delete {
+            background: #f44336;
+            color: white;
+        }
+        .whitelist-add {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .whitelist-add input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e1e4e8;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .whitelist-add button {
+            padding: 12px 25px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .empty {
+            text-align: center;
+            color: #999;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+        }
+        .example-box {
+            background: #e8f5e9;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
             font-size: 13px;
+            color: #2e7d32;
         }
-        .example-box strong {
-            color: #e65100;
-        }
-        .example-box code {
-            background: #fff;
-            padding: 2px 5px;
-            border-radius: 3px;
-            color: #e65100;
-        }
+        
         .footer {
             text-align: center;
-            margin-top: 20px;
+            margin-top: 30px;
             color: #999;
             font-size: 12px;
         }
@@ -286,88 +438,155 @@
             <span>v1.1</span>
         </h1>
         
-        <div class="example-box">
-            <strong>📌 使用示例：</strong><br>
-            • <code>*yh*</code> - 匹配所有包含 "yh" 的网站，如 https://yhmana.cc/<br>
-            • <code>*.bili*.com</code> - 匹配 bilibili.com, bili22.com 等<br>
-            • <code>zhihu.com, *.baidu.*</code> - 一行写多个，用逗号分隔<br>
-            • <code>__CF$cv$params</code> - 拦截 Cloudflare 检测脚本
+        <!-- ==================== 标签页 ==================== -->
+        <div class="tabs">
+            <div class="tab active" data-tab="rules">📋 拦截规则</div>
+            <div class="tab" data-tab="whitelist">⚪ 白名单</div>
         </div>
-
-        <div id="editingIndicator" class="editing-indicator" style="display: none;">
-            ✏️ 正在编辑规则
-        </div>
-
-        <h3>➕ 添加/编辑规则</h3>
         
-        <div class="form-group">
-            <label>📝 规则名称:</label>
-            <input type="text" id="ruleName" placeholder="例如: 拦截 yhmana 广告">
-        </div>
-
-        <div class="form-group">
-            <label>🌐 网站匹配方式:</label>
-            <select id="matchType">
-                <option value="simple" selected>简单通配符 - 支持 * 号 (推荐)</option>
-                <option value="contains">包含匹配 - 只要网址包含关键词</option>
-                <option value="regex">正则表达式 - 高级模式</option>
-            </select>
-            <div class="help-text">
-                <i>✨ 简单通配符示例：</i> <code>*yh*</code> 可匹配 https://yhmana.cc/、http://www.yh.com/<br>
-                <i>📌 包含匹配示例：</i> <code>yhmana</code> 可匹配任何包含 yhmana 的网址<br>
-                <i>⚡ 正则示例：</i> <code>^https?://(www\.)?yhmana\.cc/.*$</code>
+        <!-- ==================== 拦截规则标签页 ==================== -->
+        <div id="tab-rules" class="tab-content active">
+            <div class="example-box">
+                <strong>📌 使用示例：</strong><br>
+                • <code>*yh*</code> - 匹配所有包含 "yh" 的网站<br>
+                • <code>__CF$cv$params</code> - 拦截 Cloudflare 检测脚本<br>
+                • <code>new Function(</code> - 拦截动态函数创建
             </div>
-        </div>
 
-        <div class="form-group" id="sitePatternGroup">
-            <label>📌 网站模式 (每行一个，支持 * 通配符):</label>
-            <textarea id="sitePatterns" rows="4" placeholder="例如: 
+            <!-- 两栏布局 -->
+            <div class="two-column">
+                <!-- 左侧：添加/编辑规则 -->
+                <div class="column-left">
+                    <div class="edit-section">
+                        <h3>✏️ 添加/编辑规则</h3>
+                        
+                        <div id="editingIndicator" class="editing-indicator" style="display: none;">
+                            ✏️ 正在编辑规则
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>📝 规则名称</label>
+                            <input type="text" id="ruleName" placeholder="例如: 拦截广告脚本">
+                        </div>
+
+                        <div class="form-group">
+                            <label>🌐 网站匹配方式</label>
+                            <select id="matchType">
+                                <option value="simple" selected>简单通配符 - 支持 * 号</option>
+                                <option value="contains">包含匹配</option>
+                                <option value="regex">正则表达式</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="sitePatternGroup">
+                            <label>📌 网址 (每行一个)</label>
+                            <textarea id="sitePatterns" rows="4" placeholder="例如: 
 *yh*
 *.bili*.com
-zhihu.com
-*.baidu.*
-https://*.google.*/*"></textarea>
-            <div class="help-text">
-                <i>💡 每行一个网站模式，支持 * 通配符</i><br>
-                <i>💡 也可以一行写多个，用逗号分隔：</i> <code>*yh*, *.bili*, zhihu.com</code>
-            </div>
-        </div>
+zhihu.com"></textarea>
+                        </div>
 
-        <div class="form-group">
-            <label>🔑 要拦截的关键词 (每行一个):</label>
-            <textarea id="keywords" rows="4" placeholder="例如: 
+                        <div class="form-group">
+                            <label>🔑 要拦截的关键词 (每行一个)</label>
+                            <textarea id="keywords" rows="5" placeholder="例如: 
 __CF$cv$params
 new Function(
-var style=&quot;position:fixed; bottom
-adsbygoogle
-cloudflare"></textarea>
-            <div class="help-text">
-                <i>💡 脚本内容或 src 中包含这些关键词时会被拦截</i>
+debugger"></textarea>
+                        </div>
+
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enabled" checked>
+                            <label for="enabled">✅ 启用这条规则</label>
+                        </div>
+
+                        <div class="button-group">
+                            <button id="saveRuleBtn" class="btn-save">💾 保存规则</button>
+                            <button id="cancelEditBtn" class="btn-cancel" style="display: none;">❌ 取消编辑</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右侧：现有规则列表 -->
+                <div class="column-right">
+                    <div class="list-section">
+                        <h3>📋 现有规则列表</h3>
+                        <div class="rule-list" id="rulesList"></div>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <div class="checkbox-group">
-            <input type="checkbox" id="enabled" checked>
-            <label for="enabled">✅ 启用这条规则</label>
-        </div>
-
-        <div class="button-group">
-            <button id="saveRuleBtn" class="btn-save">💾 保存规则</button>
-            <button id="cancelEditBtn" class="btn-cancel" style="display: none;">❌ 取消编辑</button>
-        </div>
-
-        <div class="rule-list">
-            <h3>📋 现有规则列表</h3>
-            <div id="rulesList">
-                <!-- 规则会动态显示在这里 -->
+        
+        <!-- ==================== 白名单标签页 ==================== -->
+        <div id="tab-whitelist" class="tab-content">
+            <!-- 两栏布局 -->
+            <div class="two-column">
+                <!-- 左侧：添加白名单 -->
+                <div class="column-left">
+                    <div class="edit-section">
+                        <h3>➕ 添加白名单规则</h3>
+                        
+                        <!-- 全局白名单添加 -->
+                        <div class="whitelist-section">
+                            <h4>
+                                一级白名单
+                                <span class="badge global">均不拦截</span>
+                            </h4>
+                            <div class="whitelist-add">
+                                <input type="text" id="newGlobalPattern" 
+                                       placeholder="例如: *.bilibili.com 或 index.m3u8">
+                                <button id="addGlobalBtn">添加</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 次级白名单添加 -->
+                        <div class="whitelist-section">
+                            <h4>
+                                次级白名单
+                                <span class="badge secondary">不拦截 createElement 和 Function</span>
+                            </h4>
+                            <div class="whitelist-add">
+                                <input type="text" id="newSecondaryPattern" 
+                                       placeholder="例如: bilibili.com 或 deepseek.com">
+                                <button id="addSecondaryBtn">添加</button>
+                            </div>
+                        </div>
+                        
+                        <div class="example-box">
+                            <strong>📌 白名单说明：</strong><br>
+                            • <code>*bilibili*</code> - 匹配所有含 bilibili 的网站<br>
+                            • <code>*.google.com</code> - 匹配 google 子域名<br>
+                            • <code>localhost</code> - 匹配本地<br>
+                            • 一级白名单优先级高于次级白名单
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右侧：白名单列表 -->
+                <div class="column-right">
+                    <div class="list-section">
+                        <h3>📋 白名单列表</h3>
+                        
+                        <!-- 全局白名单列表 -->
+                        <div class="whitelist-section">
+                            <h4>🌍 一级白名单</h4>
+                            <div class="whitelist-list" id="globalWhitelistList"></div>
+                        </div>
+                        
+                        <!-- 次级白名单列表 -->
+                        <div class="whitelist-section">
+                            <h4>🔵 次级白名单</h4>
+                            <div class="whitelist-list" id="secondaryWhitelistList"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-
+        
         <div class="footer">
-            ⚡ 规则保存后立即生效 | 🚫 支持通配符 * | 📍 一条规则可匹配多个网站
+            ⚡ 规则和白名单保存后立即生效 | 🚫 一级白名单优先于次级白名单
         </div>
     </div>
-
+    
     <script src="options.js"></script>
 </body>
 </html>

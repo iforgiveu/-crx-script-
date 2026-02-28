@@ -8,15 +8,56 @@ document.addEventListener('DOMContentLoaded', function() {
     // 获取当前标签页的URL
     chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
         const currentUrl = tabs[0].url;
-        currentUrlDiv.textContent = `当前网址: ${currentUrl.substring(0, 50)}${currentUrl.length > 50 ? '...' : ''}`;
+        currentUrlDiv.textContent = `当前网址: ${currentUrl.substring(0, 100)}${currentUrl.length > 100 ? '...' : ''}`;
         currentUrlDiv.title = currentUrl;
+        
+        // 检查白名单状态
+        checkWhitelistStatus(currentUrl);
     });
+
+    // 检查白名单状态
+    function checkWhitelistStatus(url) {
+        try {
+            const urlObj = new URL(url);
+            const host = urlObj.hostname;
+            
+            chrome.storage.local.get(['globalWhitelist', 'secondaryWhitelist'], function(result) {
+                const globalList = result.globalWhitelist || [];
+                const secondaryList = result.secondaryWhitelist || [];
+                
+                // 简单匹配（去掉 * 通配符）
+                const inGlobal = globalList.some(p => 
+                    url.includes(p.replace(/\*/g, '')) || 
+                    host.includes(p.replace(/\*/g, ''))
+                );
+                
+                const inSecondary = secondaryList.some(p => 
+                    url.includes(p.replace(/\*/g, '')) || 
+                    host.includes(p.replace(/\*/g, ''))
+                );
+                
+                let statusHtml = '';
+                if (inGlobal) {
+                    statusHtml = '<div style="background:#dc3545;color:white;padding:8px;margin-bottom:10px;border-radius:4px;">🌍 当前网站在全局白名单中，插件已禁用</div>';
+                } else if (inSecondary) {
+                    statusHtml = '<div style="background:#fd7e14;color:white;padding:8px;margin-bottom:10px;border-radius:4px;">🔵 当前网站在次级白名单中，部分功能禁用</div>';
+                }
+                
+                if (statusHtml) {
+                    const statusDiv = document.createElement('div');
+                    statusDiv.innerHTML = statusHtml;
+                    document.body.insertBefore(statusDiv, document.body.firstChild);
+                }
+            });
+        } catch (e) {
+            // URL解析失败，忽略
+        }
+    }
 
     // 加载规则并显示
     function loadRules() {
         chrome.storage.local.get(['scriptBlockerRules'], function(result) {
             const rules = result.scriptBlockerRules || [];
-            console.log('[Popup] 加载的规则:', rules);
             displayRules(rules);
         });
     }
@@ -35,7 +76,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const sitePatterns = rule.sitePatterns || [];
             const keywords = rule.keywords || [];
             
-            // 格式化显示网站模式
             let siteDisplay = '';
             if (sitePatterns.length === 0) {
                 siteDisplay = '未设置';
@@ -45,7 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 siteDisplay = sitePatterns.slice(0, 2).join(', ') + (sitePatterns.length > 2 ? ` 等${sitePatterns.length}个` : '');
             }
             
-            // 匹配方式图标
             let matchIcon = '🔍';
             let matchText = '';
             if (matchType === 'simple') {
@@ -59,22 +98,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 matchText = '正则';
             }
             
-            // 关键词显示（直接显示内容，不超过一定长度）
             let keywordsDisplay = '';
             if (keywords.length === 0) {
                 keywordsDisplay = '无关键词';
             } else {
-                // 最多显示3个关键词，后面的用等表示
-                const maxShow = 3;
+                const maxShow = 2;
                 const showKeywords = keywords.slice(0, maxShow);
                 keywordsDisplay = showKeywords.join('、');
                 if (keywords.length > maxShow) {
                     keywordsDisplay += ` 等${keywords.length}个`;
                 }
-                
-                // 如果太长就截断
-                if (keywordsDisplay.length > 50) {
-                    keywordsDisplay = keywordsDisplay.substring(0, 47) + '...';
+                if (keywordsDisplay.length > 40) {
+                    keywordsDisplay = keywordsDisplay.substring(0, 37) + '...';
                 }
             }
             
@@ -82,16 +117,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="rule-item ${rule.enabled ? '' : 'disabled'}" data-index="${index}">
                     <div class="rule-info">
                         <div class="rule-name">
-                            <strong>${ruleName}</strong>
+                            <strong>${escapeHtml(ruleName)}</strong>
                             <span class="status-badge ${rule.enabled ? 'status-active' : 'status-inactive'}">
                                 ${rule.enabled ? '启用' : '禁用'}
                             </span>
                         </div>
-                        <div class="rule-site" title="${sitePatterns.join('\n')}">
-                            ${matchIcon} ${matchText} ${siteDisplay}
+                        <div class="rule-site" title="${escapeHtml(sitePatterns.join('\n'))}">
+                            ${matchIcon} ${matchText} ${escapeHtml(siteDisplay)}
                         </div>
-                        <div class="rule-keywords" title="${keywords.join('\n')}">
-                            🔑 ${keywordsDisplay}
+                        <div class="rule-keywords" title="${escapeHtml(keywords.join('\n'))}">
+                            🔑 ${escapeHtml(keywordsDisplay)}
                         </div>
                     </div>
                     <div class="rule-actions">
@@ -105,7 +140,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         rulesContainer.innerHTML = html;
 
-        // 添加事件监听
+        // 绑定事件
         document.querySelectorAll('.btn-toggle').forEach(btn => {
             btn.addEventListener('click', function() {
                 const index = this.dataset.index;
@@ -126,6 +161,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 deleteRule(index);
             });
         });
+    }
+
+    function escapeHtml(text) {
+        return String(text).replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                          .replace(/"/g, '&quot;')
+                          .replace(/'/g, '&#039;');
     }
 
     // 切换规则启用状态

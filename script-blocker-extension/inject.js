@@ -1,140 +1,444 @@
 ﻿// -*- coding: utf-8 -*-
-// inject.js - 脚本拦截器核心（完整策略 + 详细日志）
+// inject.js - 脚本拦截器核心
 (function() {
     'use strict';
     
-    console.log('[脚本拦截器] 🚀 已注入到页面');
+    console.log('[脚本拦截器] 🚀 已注入到页面',performance.now());
 
-    // 从 meta 标签获取规则
-    const meta = document.querySelector('meta[name="script-blocker-rules"]');
-    if (!meta) return;
+
+    // ==================== 优先执行：F12保护====================
+    (function() {
+        // 立即执行的F12保护
+		const antiF12Keywords = [
+            'keyCode == 123',
+			'e.keyCode == 123',
+			'e.key === "F12"',
+			'.keyCode==123',
+			'disableDevTools',
+			'setInterval(function() {(debugger',
+			'setInterval(function(){(debugger',
+			'setInterval(function(){(debug',
+			'setInterval(function() {(debug'
+        ];
+
+        
+        // 1. 立即禁用现有的监听器
+        document.onkeydown = null;
+        document.oncontextmenu = null;
+        window.onkeydown = null;
+        window.oncontextmenu = null;
+		//window.setInterval = null
+		for (let i = 1; i < 10; i++) {
+    clearInterval(i);  // 直接清除，不管是谁的
+}
+
+        
+        // 2. 阻止未来的事件监听器添加
+        const originalAddEventListener = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function(type, listener, options) {
+            // 阻止keydown和contextmenu事件
+            if (type === 'keydown' || type === 'contextmenu' || type === 'keyup') {
+                const listenerStr = listener.toString();
+                for (const kw of antiF12Keywords) {
+                    if (listenerStr.includes(kw)) {
+                        console.log(`[脚本拦截器] 🔒 阻止反F12事件: ${type}`);
+                        return; // 不添加这个监听器
+                    }
+                }
+            }
+            return originalAddEventListener.call(this, type, listener, options);
+        };
+        
+        // 3. 阻止直接赋值
+        Object.defineProperty(document, 'onkeydown', {
+            set: function(value) {
+                if (value) {
+                    const fnStr = value.toString();
+                    for (const kw of antiF12Keywords) {
+                        if (fnStr.includes(kw)) {
+                            console.log('[脚本拦截器] 🔒 阻止 document.onkeydown');
+                            return;
+                        }
+                    }
+                }
+                this._onkeydown = value;
+            },
+            get: function() { return this._onkeydown; }
+        });
+        
+        Object.defineProperty(document, 'oncontextmenu', {
+            set: function(value) {
+                if (value) {
+                    const fnStr = value.toString();
+                    for (const kw of antiF12Keywords) {
+                        if (fnStr.includes(kw)) {
+                            console.log('[脚本拦截器] 🔒 阻止 document.oncontextmenu');
+                            return;
+                        }
+                    }
+                }
+                this._oncontextmenu = value;
+            },
+            get: function() { return this._oncontextmenu; }
+        });
+		
+        
+        // 保存原始的 clearInterval
+        const originalClearInterval = window.clearInterval;
+
+    })();
+
+
+    // ==================== 正常的规则获取和初始化 ====================
     
-    let rules = [];
-    try {
-        rules = JSON.parse(meta.getAttribute('content') || '[]');
-    } catch (e) {
-        console.log('[脚本拦截器] ⚠️ 规则解析失败:', e);
-        return;
+    // 从 meta 标签获取规则和白名单
+	function getConfigFromMeta() {
+		// 获取规则（原有代码）
+		const rulesMeta = document.querySelector('meta[name="script-blocker-rules"]');
+		let rules = [];
+		if (rulesMeta) {
+			try {
+				rules = JSON.parse(rulesMeta.getAttribute('content') || '[]');
+			} catch (e) {}
+		}
+		// 获取全局白名单
+		const globalMeta = document.querySelector('meta[name="script-blocker-global"]');
+		let globalWhitelist = [];
+		if (globalMeta) {
+			try {
+				globalWhitelist = JSON.parse(globalMeta.getAttribute('content') || '[]');
+			} catch (e) {}
+		}
+		// 获取次级白名单
+		const secondaryMeta = document.querySelector('meta[name="script-blocker-secondary"]');
+		let secondaryWhitelist = [];
+		if (secondaryMeta) {
+			try {
+				secondaryWhitelist = JSON.parse(secondaryMeta.getAttribute('content') || '[]');
+			} catch (e) {}
+		}
+		return { rules, globalWhitelist, secondaryWhitelist };
+	}
+	
+	// 使用
+	const config = getConfigFromMeta();
+	const rules = config.rules;
+	const globalWhitelist0 = config.globalWhitelist;
+	const secondaryWhitelist0 = config.secondaryWhitelist;
+
+    
+	// 通配符匹配函数
+    function wildcardMatch(text, pattern) {
+        const regexPattern = pattern
+            .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*');
+        const regex = new RegExp(`^${regexPattern}$`, 'i');
+        const partialRegex = new RegExp(regexPattern, 'i');
+        return regex.test(text) || partialRegex.test(text);
     }
+	
 
     // 检查当前网站是否匹配规则
     const currentUrl = window.location.href;
     const currentHost = window.location.hostname;
+	
+	const extrasecwhitelist=['bilibili','deepseek.com','douyin']//额外指定的白名单
+	const extraglowhitelist=['index.m3u8']//额外指定的白名单
+	// 合并去重
+	const globalWhitelist=[...new Set([...extraglowhitelist, ...globalWhitelist0])];
+	const secondaryWhitelist = [...new Set([...extrasecwhitelist, ...secondaryWhitelist0])];
+	
     
     console.log('[脚本拦截器] 🌐 当前网站:', currentHost);
     console.log('[脚本拦截器] 📍 完整地址:', currentUrl);
     console.log('[脚本拦截器] 📋 加载的规则数:', rules.length);
+	
+		// 全局白名单检查
+	const inGlobalWhitelist = globalWhitelist.some(pattern => 
+		wildcardMatch(currentHost, pattern) || wildcardMatch(currentUrl, pattern)
+	);
+	if(inGlobalWhitelist){
+	console.log('🙄\n一级白名单网站:',currentUrl,",退出拦截");return;}
+	// 次级白名单检查  
+	const inSecondaryWhitelist = secondaryWhitelist.some(pattern => 
+		wildcardMatch(currentHost, pattern) || wildcardMatch(currentUrl, pattern)
+	);
+	if(inSecondaryWhitelist){
+	console.log('🙄\n次级白名单网站:',currentUrl,",仅部分拦截");}
 
-    let keywordsToBlock = [];
+	let keywordsToBlock = [];
     
-    for (const rule of rules) {
-        if (!rule.enabled) continue;
-        
+    
+
+    // 检查网站是否匹配单个规则
+    function matchSite(rule) {
         const matchType = rule.matchType || 'simple';
         const sitePatterns = rule.sitePatterns || [];
-        let matched = false;
         
-        for (const pattern of sitePatterns) {
+        for (const pattern of sitePatterns) {//每个匹配的网址
             if (!pattern) continue;
             
             if (matchType === 'simple') {
-                const regexPattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-                const regex = new RegExp(regexPattern, 'i');
-                if (regex.test(currentUrl) || regex.test(currentHost)) {
+                if (wildcardMatch(currentUrl, pattern) || wildcardMatch(currentHost, pattern)) {
                     console.log(`[脚本拦截器] ✅ 通配符匹配: "${pattern}"`);
-                    matched = true;
-                    break;
+                    return true;
                 }
             } else if (matchType === 'contains') {
                 if (currentUrl.includes(pattern) || currentHost.includes(pattern)) {
                     console.log(`[脚本拦截器] ✅ 包含匹配: "${pattern}"`);
-                    matched = true;
-                    break;
+                    return true;
                 }
             } else if (matchType === 'regex') {
                 try {
                     const regex = new RegExp(pattern, 'i');
                     if (regex.test(currentUrl) || regex.test(currentHost)) {
                         console.log(`[脚本拦截器] ✅ 正则匹配: "${pattern}"`);
-                        matched = true;
-                        break;
+                        return true;
                     }
                 } catch (e) {}
             }
         }
-        
-        if (matched) {
-            keywordsToBlock = rule.keywords || [];
-            console.log(`[脚本拦截器] 🎯 匹配规则: ${rule.name || '未命名规则'}`);
-            console.log('[脚本拦截器] 🔑 拦截关键词:', keywordsToBlock.join('、'));
-            break;
-        }
+        return false;
     }
 
-    if (keywordsToBlock.length === 0) {
+    // 合并所有匹配规则的关键词
+    let matchedRules = [];
+    for (const rule of rules) {
+        if (!rule.enabled) continue;
+        if (matchSite(rule)) {
+            matchedRules.push(rule);
+        }
+    }
+    
+    if (matchedRules.length > 0) {
+        const allKeywords = [];
+        matchedRules.forEach(rule => {
+            console.log(`[脚本拦截器] 📋 匹配规则: ${rule.name || '未命名规则'}`);
+            if (rule.keywords && rule.keywords.length > 0) {
+                allKeywords.push(...rule.keywords);
+            }
+        });
+        keywordsToBlock = [...new Set(allKeywords)];
+        console.log('[脚本拦截器] 🔑 合并后的拦截关键词:', keywordsToBlock.join('、'));
+    } else {
         console.log('[脚本拦截器] ⏭️ 当前网站无匹配规则，退出');
         return;
     }
+	// 保存原始方法
+    const originalSetTimeout = window.setTimeout;
+    const originalSetInterval = window.setInterval;
+    const originalEval = window.eval;
+    const originalFunction = window.Function;
+    const originalCreateElement = document.createElement;
+    const originalAppendChild = Node.prototype.appendChild;
+    const originalInsertBefore = Node.prototype.insertBefore;
+    const originalReplaceChild = Node.prototype.replaceChild;
+    const originalWrite = document.write;
+    const originalWriteln = document.writeln;
+    const originalWorker = window.Worker;
+    const originalSharedWorker = window.SharedWorker;
+    const originalRegister = navigator.serviceWorker?.register;
 
-    // 工具函数
+    // ==================== 工具函数 ====================
     const processedNodes = new WeakSet();
     const blockedScripts = new Set();
 
-    function truncateContent(content, maxLength = 160) {//截断前160
+    function truncateContent(content, maxLength = 666) {//截断
         if (!content) return '';
         if (content.length <= maxLength) return content;
         return content.substring(0, maxLength) + '...';
     }
 
-    function extractFeatures(content) {
-        if (!content) return '无内容';
-        const features = [];
-        if (content.includes('__CF$cv$params')) features.push('Cloudflare检测');
-        if (content.includes('new Function')) features.push('Function构造函数');
-        if (content.includes('eval(')) features.push('eval执行');
-        if (content.includes('document.write')) features.push('document.write');
-        if (content.includes('position:fixed')) features.push('固定定位元素');
-        if (content.includes('display:none')) features.push('隐藏元素');
-        if (content.includes('base64')) features.push('Base64编码');
-        if (content.includes('fromCharCode')) features.push('字符编码混淆');
-        const domainMatch = content.match(/https?:\/\/([^\/"\'\s]+)/);
-        if (domainMatch) features.push(`域名:${domainMatch[1]}`);
-        return features.length ? features.join(' | ') : '普通脚本';
+    // 获取元素的DOM路径
+    function getElementPath(element) {
+        if (!element) return 'none';
+        const path = [];
+        let current = element;
+        let level = 0;
+        
+        while (current && current.nodeType === 1 && level < 5) {
+            let desc = current.nodeName.toLowerCase();
+            if (current.id) desc += `#${current.id}`;
+            if (current.className) {
+                const classes = current.className.split(' ').slice(0, 3).join('.');
+                if (classes) desc += `.${classes}`;
+            }
+            if (current.src && current.src.length < 50) {
+                const srcShort = current.src.split('/').pop();
+                if (srcShort) desc += `[src:${srcShort}]`;
+            }
+            path.unshift(desc);
+            current = current.parentElement;
+            level++;
+        }
+        return path.join(' > ');
     }
 
-    function logBlock(interceptor, keyword, content, source = '') {
-        const key = `${interceptor}:${content.substring(0, 100)}`;
+    // 获取调用栈
+    function getCallStack(){try{throw new Error();}catch(e){return e.stack.split('\n').slice(2).join('\n    ');}}
+
+    // 详细日志函数
+    function logBlock(interceptor, keyword, content, source = '', element = null) {
+        const key = `${interceptor}:${keyword}:${Date.now()}:${Math.random()}`;
         if (blockedScripts.has(key)) return;
         blockedScripts.add(key);
         
-        const truncated = truncateContent(content);
-        const features = extractFeatures(content);
-        
-        console.group(`[脚本拦截器] 🚫 ${interceptor} 拦截`);
+        console.group(`[脚本拦截器] 🚫 ${interceptor} 拦截`,performance.now());
         console.log(`   关键词: "${keyword}"`);
-        console.log(`   特征: ${features}`);
-        if (source) console.log(`   来源: ${source}`);
-        console.log(`   内容预览: ${truncated}`);
+        console.log(`   来源类型: ${source || '未知'}`);
+        
+        if (element) {
+            console.log(`   元素类型: ${element.nodeName}`);
+            if (element.id) console.log(`   元素ID: ${element.id}`);
+            if (element.className) console.log(`   元素类名: ${element.className}`);
+            
+            if (source.includes('内联事件')) {
+                const match = source.match(/内联事件: (\w+)/);
+                if (match) console.log(`   事件名称: ${match[1]}`);
+            }
+            
+            if (element.src) console.log(`   元素src: ${truncateContent(element.src, 100)}`);
+            if (element.href) console.log(`   元素href: ${truncateContent(element.href, 100)}`);
+            if (element.data) console.log(`   元素data: ${truncateContent(element.data, 200)}`);
+            //if (element.data) console.log(`   元素data: ${element.data}`);
+            
+            console.log(`   DOM位置: ${getElementPath(element)}`);
+        }
+        
+        const stack = getCallStack();
+        if (stack) console.log(`   调用栈:\n    ${stack}`);
+        //console.trace(`   调用栈:\n`);
+        
+        console.log(`   内容预览: ${truncateContent(content)}`);
         console.groupEnd();
     }
 
+    // ==================== 完整的 checkNode 函数 ====================
     function checkNode(node) {
         if (!node || processedNodes.has(node)) return null;
+        
+        // 1. textContent 和 src
         const content = node.textContent || '';
         const src = node.src || '';
         for (const kw of keywordsToBlock) {
-            if (content.includes(kw)) return { kw, content, type: 'content', src: null };
-            if (src.includes(kw)) return { kw, content: src, type: 'src', src };
+            if (content.includes(kw)) return { kw, content, type: 'content', source: '文本内容' };
+            if (src.includes(kw)) return { kw, content: src, type: 'src', source: 'src属性' };
         }
+        
+        // 2. 检查内联事件属性
+        if (node.nodeType === 1) {
+            const eventAttrs = [
+                'onclick', 'ondblclick', 'onmousedown', 'onmouseup', 'onmouseover',
+                'onmousemove', 'onmouseout', 'onmouseenter', 'onmouseleave',
+                'onload', 'onunload', 'onerror', 'onresize', 'onscroll',
+                'onfocus', 'onblur', 'onchange', 'onsubmit', 'onreset',
+                'onselect', 'oninput', 'onkeydown', 'onkeypress', 'onkeyup',
+                'oncontextmenu', 'onpaste', 'oncopy', 'oncut', 'ondrag',
+                'ondrop', 'ontouchstart', 'ontouchmove', 'ontouchend',
+                'onanimationstart', 'onanimationend', 'onanimationiteration',
+                'ontransitionstart', 'ontransitionend', 'ontransitionrun',
+                'onwheel', 'onauxclick', 'ongotpointercapture', 'onlostpointercapture',
+                'onpointerdown', 'onpointermove', 'onpointerup', 'onpointercancel',
+                'onpointerover', 'onpointerout', 'onpointerenter', 'onpointerleave'
+            ];
+            
+            for (const attr of eventAttrs) {
+                const attrValue = node.getAttribute(attr);
+                if (attrValue && typeof attrValue === 'string') {
+                    for (const kw of keywordsToBlock) {
+                        if (attrValue.includes(kw)) {
+                            return { 
+                                kw, 
+                                content: attrValue, 
+                                type: 'event', 
+                                source: `内联事件: ${attr}`,
+                                attr: attr 
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 3. 检查 data: 和 javascript: 伪协议
+        if (node.nodeType === 1) {
+            if (node.href && typeof node.href === 'string' && node.href.startsWith('javascript:')) {
+                const jsCode = node.href.substring(11);
+                for (const kw of keywordsToBlock) {
+                    if (jsCode.includes(kw)) {
+                        return { kw, content: jsCode, type: 'pseudo', source: 'javascript:伪协议' };
+                    }
+                }
+            }
+            
+            if (node.src && typeof node.src === 'string' && node.src.startsWith('javascript:')) {
+                const jsCode = node.src.substring(11);
+                for (const kw of keywordsToBlock) {
+                    if (jsCode.includes(kw)) {
+                        return { kw, content: jsCode, type: 'pseudo', source: 'iframe javascript:伪协议' };
+                    }
+                }
+            }
+            
+            if (node.src && typeof node.src === 'string' && node.src.startsWith('data:text/javascript')) {
+                const jsCode = decodeURIComponent(node.src.split(',')[1] || '');
+                for (const kw of keywordsToBlock) {
+                    if (jsCode.includes(kw)) {
+                        return { kw, content: jsCode, type: 'data', source: 'data:javascript协议' };
+                    }
+                }
+            }
+        }
+        
+        // 4. 检查 <object> 和 <embed> 标签
+        if (node.nodeName === 'OBJECT' || node.nodeName === 'EMBED') {
+            const data = node.data || node.src || '';
+            if (data.match(/\.js$/i)) {
+                for (const kw of keywordsToBlock) {
+                    if (data.includes(kw)) {
+                        return { kw, content: data, type: 'plugin', source: `${node.nodeName} 插件` };
+                    }
+                }
+            }
+        }
+        
+        // 5. 检查 <meta> 刷新/重定向
+        if (node.nodeName === 'META') {
+            const httpEquiv = node.getAttribute('http-equiv');
+            const metaContent = node.getAttribute('content');
+            if (httpEquiv && httpEquiv.toLowerCase() === 'refresh' && metaContent) {
+                if (metaContent.includes('javascript:')) {
+                    for (const kw of keywordsToBlock) {
+                        if (metaContent.includes(kw)) {
+                            return { kw, content: metaContent, type: 'meta', source: 'meta refresh' };
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 6. 检查 <base> 标签
+        if (node.nodeName === 'BASE') {
+            const href = node.href || '';
+            for (const kw of keywordsToBlock) {
+                if (href.includes(kw)) {
+                    return { kw, content: href, type: 'base', source: 'base href' };
+                }
+            }
+        }
+        
         return null;
     }
 
-    // ==================== 1. createElement ====================
-    console.log('[脚本拦截器] 🛡️ 部署 createElement 拦截器');
-    const originalCreateElement = document.createElement;
-    
+        
+	// ==================== 1. createElement ====================
+    (function() {
+	if (inSecondaryWhitelist) return;
+	
+	console.log('[脚本拦截器] 🛡️ 部署 createElement 拦截器');
     document.createElement = function(tagName, options) {
-        const element = originalCreateElement.call(document, tagName, options);
+        //return
+		const element = originalCreateElement.call(document, tagName, options);
         if (tagName !== 'script') return element;
         
         let blocked = false;
@@ -148,7 +452,7 @@
                 }
                 for (const kw of keywordsToBlock) {
                     if (value.includes(kw)) {
-                        logBlock('createElement.src', kw, value, '外部脚本创建');
+                        logBlock('createElement.src', kw, value, '动态创建的外部脚本', scriptElement);
                         blocked = true;
                         return;
                     }
@@ -166,7 +470,7 @@
                 }
                 for (const kw of keywordsToBlock) {
                     if (value.includes(kw)) {
-                        logBlock('createElement.innerHTML', kw, value, '内联脚本创建');
+                        logBlock('createElement.innerHTML', kw, value, '动态创建的内联脚本', scriptElement);
                         this._inner = '/* 被脚本拦截器拦截 */';
                         blocked = true;
                         return;
@@ -185,7 +489,7 @@
                 }
                 for (const kw of keywordsToBlock) {
                     if (value.includes(kw)) {
-                        logBlock('createElement.textContent', kw, value, '内联脚本创建');
+                        logBlock('createElement.textContent', kw, value, '动态创建的内联脚本', scriptElement);
                         this._text = '/* 被脚本拦截器拦截 */';
                         blocked = true;
                         return;
@@ -198,18 +502,39 @@
         
         return scriptElement;
     };
+	})();
 
     // ==================== 2. MutationObserver ====================
-    console.log('[脚本拦截器] 👁️ 部署 MutationObserver');
+    console.log('[脚本拦截器] 👁️ 部署 MutationObserver拦截器');
     const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
+        
+		mutations.forEach(function(mutation) {
             mutation.addedNodes.forEach(function(node) {
                 if (processedNodes.has(node)) return;
+				const named=node.nodeName;
+				if(named==="BODY" || named==="HEAD" || named==="HTML") return;
+
                 
                 const result = checkNode(node);
                 if (result) {
-                    logBlock('MutationObserver', result.kw, result.content, 
-                        result.type === 'src' ? `外部脚本 (${node.nodeName})` : `${node.nodeName}节点`);
+                    let sourceDesc = '';
+                    if (result.type === 'event') {
+                        sourceDesc = `内联事件: ${result.attr}`;
+                    } else if (result.type === 'pseudo') {
+                        sourceDesc = result.source;
+                    } else if (result.type === 'data') {
+                        sourceDesc = result.source;
+                    } else if (result.type === 'plugin') {
+                        sourceDesc = result.source;
+                    } else if (result.type === 'meta') {
+                        sourceDesc = result.source;
+                    } else if (result.type === 'base') {
+                        sourceDesc = result.source;
+                    } else {
+                        sourceDesc = result.type === 'src' ? '外部脚本节点' : '内联脚本节点';
+                    }
+                    
+                    logBlock('MutationObserver', result.kw, result.content, sourceDesc, node);
                     node.remove();
                     processedNodes.add(node);
                     return;
@@ -220,13 +545,13 @@
                     const text = node.textContent || '';
                     for (const kw of keywordsToBlock) {
                         if (src.includes(kw)) {
-                            logBlock('MutationObserver', kw, src, '外部脚本标签');
+                            logBlock('MutationObserver', kw, src, '外部脚本标签', node);
                             node.remove();
                             processedNodes.add(node);
                             break;
                         }
                         if (text.includes(kw)) {
-                            logBlock('MutationObserver', kw, text, '内联脚本标签');
+                            logBlock('MutationObserver', kw, text, '内联脚本标签', node);
                             node.remove();
                             processedNodes.add(node);
                             break;
@@ -241,54 +566,66 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
     // ==================== 3. appendChild ====================
-    console.log('[脚本拦截器] 📦 部署 appendChild 拦截器');
-    const originalAppendChild = Node.prototype.appendChild;
-    Node.prototype.appendChild = function(node) {
-        if (!node || processedNodes.has(node)) return originalAppendChild.call(this, node);
-        const result = checkNode(node);
-        if (result) {
-            logBlock('appendChild', result.kw, result.content, 
-                result.type === 'src' ? `外部脚本 (${node.nodeName})` : `${node.nodeName}节点`);
-            processedNodes.add(node);
-            return node;
-        }
-        return originalAppendChild.call(this, node);
-    };
+	console.log('[脚本拦截器] 📦 部署 appendChild 拦截器');
+	Node.prototype.appendChild = function(node) {
+		// 1. 先检查 node 是否为空
+		if (!node) return originalAppendChild.call(this, node);
+		// 2. 检查 node 是否是真正的节点对象
+		if (typeof node !== 'object' || !node.nodeName) {
+			// 如果不是节点，直接调用原生方法
+			return originalAppendChild.call(this, node);
+		}
+		// 3. 检查是否已处理
+		if (processedNodes.has(node)) return originalAppendChild.call(this, node);
+		// 4. 安全检查后再调用 checkNode
+		const result = checkNode(node);
+		if (result) {
+			logBlock('appendChild', result.kw, result.content, 
+				result.type === 'src' ? 'appendChild添加的外部脚本' : 'appendChild添加的内联脚本', node);
+			processedNodes.add(node);
+			return node;
+		}
+		return originalAppendChild.call(this, node);
+	};
 
     // ==================== 4. insertBefore ====================
-    console.log('[脚本拦截器] 📌 部署 insertBefore 拦截器');
-    const originalInsertBefore = Node.prototype.insertBefore;
-    Node.prototype.insertBefore = function(newNode, referenceNode) {
-        if (!newNode || processedNodes.has(newNode)) return originalInsertBefore.call(this, newNode, referenceNode);
-        const result = checkNode(newNode);
-        if (result) {
-            logBlock('insertBefore', result.kw, result.content, 
-                result.type === 'src' ? `外部脚本 (${newNode.nodeName})` : `${newNode.nodeName}节点`);
-            processedNodes.add(newNode);
-            return newNode;
-        }
-        return originalInsertBefore.call(this, newNode, referenceNode);
-    };
+	Node.prototype.insertBefore = function(newNode, referenceNode) {
+		if (!newNode) return originalInsertBefore.call(this, newNode, referenceNode);
+		if (typeof newNode !== 'object' || !newNode.nodeName) {
+			return originalInsertBefore.call(this, newNode, referenceNode);
+		}
+		if (processedNodes.has(newNode)) return originalInsertBefore.call(this, newNode, referenceNode);
+		
+		const result = checkNode(newNode);
+		if (result) {
+			logBlock('insertBefore', result.kw, result.content, 
+				result.type === 'src' ? 'insertBefore添加的外部脚本' : 'insertBefore添加的内联脚本', newNode);
+			processedNodes.add(newNode);
+			return newNode;
+		}
+		return originalInsertBefore.call(this, newNode, referenceNode);
+	};
 
-    // ==================== 5. replaceChild ====================
-    console.log('[脚本拦截器] 🔄 部署 replaceChild 拦截器');
-    const originalReplaceChild = Node.prototype.replaceChild;
-    Node.prototype.replaceChild = function(newChild, oldChild) {
-        if (!newChild || processedNodes.has(newChild)) return originalReplaceChild.call(this, newChild, oldChild);
-        const result = checkNode(newChild);
-        if (result) {
-            logBlock('replaceChild', result.kw, result.content, 
-                result.type === 'src' ? `外部脚本 (${newChild.nodeName})` : `${newChild.nodeName}节点`);
-            processedNodes.add(newChild);
-            return oldChild;
-        }
-        return originalReplaceChild.call(this, newChild, oldChild);
-    };
+// ==================== 5. replaceChild ====================
+	Node.prototype.replaceChild = function(newChild, oldChild) {
+		if (!newChild) return originalReplaceChild.call(this, newChild, oldChild);
+		if (typeof newChild !== 'object' || !newChild.nodeName) {
+			return originalReplaceChild.call(this, newChild, oldChild);
+		}
+		if (processedNodes.has(newChild)) return originalReplaceChild.call(this, newChild, oldChild);
+		
+		const result = checkNode(newChild);
+		if (result) {
+			logBlock('replaceChild', result.kw, result.content, 
+				result.type === 'src' ? 'replaceChild添加的外部脚本' : 'replaceChild添加的内联脚本', newChild);
+			processedNodes.add(newChild);
+			return oldChild;
+		}
+		return originalReplaceChild.call(this, newChild, oldChild);
+	};
 
     // ==================== 6. document.write ====================
     console.log('[脚本拦截器] ✍️ 部署 document.write 拦截器');
-    const originalWrite = document.write;
-    const originalWriteln = document.writeln;
     
     document.write = function(str) {
         if (typeof str === 'string') {
@@ -303,7 +640,8 @@
     };
     
     document.writeln = function(str) {
-        if (typeof str === 'string') {
+        console.trace('writeln检查：',str);
+		if (typeof str === 'string') {
             for (const kw of keywordsToBlock) {
                 if (str.includes(kw) && str.includes('<script')) {
                     logBlock('document.writeln', kw, str, 'document.writeln写入');
@@ -315,40 +653,40 @@
     };
 
     // ==================== 7. eval ====================
-    console.log('[脚本拦截器] 🧠 部署 eval 拦截器');
-    const originalEval = window.eval;
-    window.eval = function(code) {
-        if (typeof code === 'string') {
-            for (const kw of keywordsToBlock) {
-                if (code.includes(kw)) {
-                    logBlock('eval', kw, code, 'eval执行');
-                    return;
-                }
-            }
-        }
-        return originalEval.call(this, code);
-    };
+	console.log('[脚本拦截器] 🧠 部署 eval 拦截器');
+	window.eval=function(code){
+	//console.trace('[脚本拦截器] 🧠eval类型',typeof code,'\n',code);
+	if(typeof code==='string'){for(const kw of keywordsToBlock){if(code.includes(kw)){logBlock('eval',kw,code,'eval执行(字符串)');return;}}}
+	if(typeof code==='function'){const funcStr=code.toString();for(const kw of keywordsToBlock){if(funcStr.includes(kw)){logBlock('eval',kw,funcStr,'eval执行(函数)');return;}}}
+	return originalEval.call(this,code);};
+
+	Object.defineProperty(window, 'eval', {// 防止通过别名绕过
+		value: window.eval,
+		writable: false,      // 禁止修改
+		configurable: false    // 禁止重新配置
+	});
 
     // ==================== 8. Function ====================
-    console.log('[脚本拦截器] 🧠 部署 Function 拦截器');
-    const originalFunction = window.Function;
-    window.Function = function(...args) {
+    (function() {
+	if (inSecondaryWhitelist) return;
+	console.log('[脚本拦截器] 🧠 部署 Function 拦截器');
+	window.Function = function(...args) {
         const code = args[args.length - 1] || '';
-        if (typeof code === 'string') {
+        
+		if (typeof code === 'string') {
             for (const kw of keywordsToBlock) {
                 if (code.includes(kw)) {
                     logBlock('Function', kw, code, 'new Function构造函数');
                     return function() {};
-                }
-            }
-        }
+                    //return originalFunction.apply(this, args);
+                }}}
         return originalFunction.apply(this, args);
     };
     Object.setPrototypeOf(window.Function, originalFunction);
+	})();
 
     // ==================== 9. setTimeout ====================
     console.log('[脚本拦截器] ⏱️ 部署 setTimeout 拦截器');
-    const originalSetTimeout = window.setTimeout;
     window.setTimeout = function(handler, timeout, ...args) {
         if (typeof handler === 'string') {
             for (const kw of keywordsToBlock) {
@@ -358,14 +696,29 @@
                 }
             }
         }
+        
+        if (typeof handler === 'function') {
+            const handlerStr = handler.toString();
+            for (const kw of keywordsToBlock) {
+                if (handlerStr.includes(kw)) {
+                    logBlock('setTimeout', kw, handlerStr, '函数形式setTimeout');
+                    return 0;
+                }
+            }
+        }
+        
         return originalSetTimeout.call(this, handler, timeout, ...args);
     };
 
-    // ==================== 10. setInterval ====================
-    console.log('[脚本拦截器] ⏱️ 部署 setInterval 拦截器');
-    const originalSetInterval = window.setInterval;
+// ==================== 10. setInterval ====================
+    console.log('[脚本拦截器] ⏱️ 部署 setInterval 拦截器',
+	performance.now()
+	);
     window.setInterval = function(handler, interval, ...args) {
-        if (typeof handler === 'string') {
+        // const kk=handler.toString()
+		// const  jj = typeof handler
+		// console.log('[脚本拦截器] ⏱️类型:',jj,'\n', kk);
+		if (typeof handler === 'string') {
             for (const kw of keywordsToBlock) {
                 if (handler.includes(kw)) {
                     logBlock('setInterval', kw, handler, '字符串形式setInterval');
@@ -373,20 +726,37 @@
                 }
             }
         }
+        if (typeof handler === 'function') {
+            const handlerStr = handler.toString();
+            for (const kw of keywordsToBlock) {
+                if (handlerStr.includes(kw)) {
+                    logBlock('setInterval', kw, handlerStr, '函数形式setInterval');
+                    //console.log('间隔',interval,'\n',...args,performance.now());
+					return 0;
+                }
+            }
+        }
+        
         return originalSetInterval.call(this, handler, interval, ...args);
     };
-
-    // ==================== 11. Worker ====================
-    console.log('[脚本拦截器] 👷 部署 Worker 拦截器');
-    const originalWorker = window.Worker;
+	
+	// ==================== 11. web Worker ====================
+    console.log('[脚本拦截器] 👷 部署 web Worker 拦截器');
     if (originalWorker) {
         window.Worker = function(url, options) {
             const urlStr = typeof url === 'string' ? url : url.href || '';
             for (const kw of keywordsToBlock) {
                 if (urlStr.includes(kw)) {
-                    logBlock('Worker', kw, urlStr, 'Worker线程创建');
-                    return { postMessage(){}, terminate(){}, addEventListener(){}, removeEventListener(){}, 
-                            dispatchEvent(){return true}, onmessage:null, onerror:null };
+                    logBlock('web Worker', kw, urlStr, 'web Worker线程创建');
+                    return {
+                        postMessage(){},
+                        terminate(){},
+                        addEventListener(){},
+                        removeEventListener(){},
+                        dispatchEvent(){return true},
+                        onmessage: null,
+                        onerror: null
+                    };
                 }
             }
             return new originalWorker(url, options);
@@ -395,15 +765,23 @@
     }
 
     // ==================== 12. SharedWorker ====================
-    console.log('[脚本拦截器] 👥 部署 SharedWorker 拦截器');
-    const originalSharedWorker = window.SharedWorker;
+    console.log('[脚本拦截器] 👥 部署 Shared Worker 拦截器');
     if (originalSharedWorker) {
         window.SharedWorker = function(url, options) {
             const urlStr = typeof url === 'string' ? url : url.href || '';
             for (const kw of keywordsToBlock) {
                 if (urlStr.includes(kw)) {
-                    logBlock('SharedWorker', kw, urlStr, 'SharedWorker线程创建');
-                    return { port: { postMessage(){}, close(){}, start(){}, addEventListener(){}, removeEventListener(){} }, onerror:null };
+                    logBlock('Shared Worker', kw, urlStr, 'Shared Worker线程创建');
+                    return {
+                        port: {
+                            postMessage(){},
+                            close(){},
+                            start(){},
+                            addEventListener(){},
+                            removeEventListener(){}
+                        },
+                        onerror: null
+                    };
                 }
             }
             return new originalSharedWorker(url, options);
@@ -411,15 +789,14 @@
         window.SharedWorker.prototype = originalSharedWorker.prototype;
     }
 
-    // ==================== 13. ServiceWorker ====================
-    console.log('[脚本拦截器] 🔧 部署 ServiceWorker 拦截器');
-    if (navigator.serviceWorker && navigator.serviceWorker.register) {
-        const originalRegister = navigator.serviceWorker.register;
+    // ==================== 13. Service Worker ====================
+    console.log('[脚本拦截器] 🔧 部署 Service Worker 拦截器');
+    if (navigator.serviceWorker && originalRegister) {
         navigator.serviceWorker.register = function(scriptURL, options) {
             const urlStr = typeof scriptURL === 'string' ? scriptURL : scriptURL.href || '';
             for (const kw of keywordsToBlock) {
                 if (urlStr.includes(kw)) {
-                    logBlock('ServiceWorker', kw, urlStr, 'ServiceWorker注册');
+                    logBlock('Service Worker', kw, urlStr, 'Service Worker注册');
                     return Promise.reject(new Error('Blocked by Script Blocker'));
                 }
             }
@@ -436,7 +813,7 @@
                     if (node.src) {
                         for (const kw of keywordsToBlock) {
                             if (node.src.includes(kw)) {
-                                logBlock('module脚本', kw, node.src, 'module外部脚本');
+                                logBlock('module脚本', kw, node.src, 'module外部脚本', node);
                                 node.remove();
                                 break;
                             }
@@ -445,7 +822,7 @@
                     if (node.textContent) {
                         for (const kw of keywordsToBlock) {
                             if (node.textContent.includes(kw)) {
-                                logBlock('module脚本', kw, node.textContent, 'module内联脚本');
+                                logBlock('module脚本', kw, node.textContent, 'module内联脚本', node);
                                 node.remove();
                                 break;
                             }
@@ -456,6 +833,8 @@
         });
     });
     moduleObserver.observe(document.documentElement, { childList: true, subtree: true });
+	
+
 
     // ==================== 15. data URI 脚本 ====================
     console.log('[脚本拦截器] 📊 部署 data URI 脚本拦截器');
@@ -466,7 +845,7 @@
                     const content = decodeURIComponent(node.src.split(',')[1] || '');
                     for (const kw of keywordsToBlock) {
                         if (content.includes(kw)) {
-                            logBlock('data URI', kw, content, 'data URI脚本');
+                            logBlock('data URI', kw, content, 'data URI脚本', node);
                             node.remove();
                             break;
                         }
@@ -476,74 +855,119 @@
         });
     });
     dataURIObserver.observe(document.documentElement, { childList: true, subtree: true });
+	
+	//===网络请求部分拦截===待测试
+	// (function() {
+	// const originalFetch = window.fetch;// 拦截包含 dmwps.alpha 的网络请求
+	// window.fetch = function(...args) {
+		// const url = args[0];
+		// if (typeof url === 'string' ) {
+			// for (const kw of keywordsToBlock) {
+				// if (url.includes(kw)) {
+				// console.log('[拦截器] 🚫 拦截Fetch:', url);// 返回一个空响应
+				// return Promise.resolve(new Response('', {
+				// status: 200,
+				// statusText: 'OK',
+				// headers: new Headers({'Content-Type': 'application/javascript'})}));
+		// }}}
+		// return originalFetch.apply(this, args);
+	// };
+	// const XHR = XMLHttpRequest;// 拦截 XMLHttpRequest
+	// XMLHttpRequest = function() {
+		// const xhr = new XHR();
+		// const originalOpen = xhr.open;
+		// xhr.open = function(method, url) {
+			// if (typeof url === 'string' ) {
+				// for (const kw of keywordsToBlock) {
+					// if (url.includes(kw)) {
+					// console.log('[拦截器] 🚫 拦截 XHR 请求:', url);
+					// url = 'about:blank';// 修改请求到一个不存在的地址或空文件
+			// }}}
+			// return originalOpen.apply(this, arguments);
+		// };
+		// return xhr;
+	// };
+	// })();
+	
 
-    // ==================== 16. Cloudflare 专用 ====================
-    if (keywordsToBlock.some(k => k.includes('__CF$cv$params') || k.includes('cloudflare'))) {
-        console.log('[脚本拦截器] ☁️ 部署 Cloudflare 专用拦截器');
-        
-        let cfBlocked = false;
-        Object.defineProperty(window, '__CF$cv$params', {
-            set: function(value) {
-                if (!cfBlocked) {
-                    console.group('[脚本拦截器] 🚫 Cloudflare 变量拦截');
-                    console.log('   变量: __CF$cv$params');
-                    console.log('   值:', value);
-                    console.groupEnd();
-                    cfBlocked = true;
-                }
-            },
-            get: function() { return null; },
-            configurable: false
-        });
-        
-        let cfOptBlocked = false;
-        Object.defineProperty(window, '_cf_chl_opt', {
-            set: function(value) {
-                if (!cfOptBlocked) {
-                    console.group('[脚本拦截器] 🚫 Cloudflare 变量拦截');
-                    console.log('   变量: _cf_chl_opt');
-                    console.log('   值:', value);
-                    console.groupEnd();
-                    cfOptBlocked = true;
-                }
-            },
-            get: function() { return null; },
-            configurable: false
-        });
-    }
 
-    // ==================== 17. 初始清理 ====================
-    console.log('[脚本拦截器] 🧹 执行初始清理');
-    setTimeout(function() {
-        document.querySelectorAll('script').forEach(function(script) {
-            const content = script.textContent || '';
-            const src = script.src || '';
-            for (const kw of keywordsToBlock) {
-                if (content.includes(kw)) {
-                    logBlock('初始清理', kw, content, '已存在的内联脚本');
-                    script.remove();
-                    break;
+    // ==================== script标签清理 ====================
+    console.log('[脚本拦截器] 🧹 部署script标签清理\n(只是清理标签，一般来说该项没法直接拦截标签内的js执行)');
+    
+    // 多次清理，确保捕获延迟加载的脚本
+    const cleanTimes = [0, 200, 400, 600, 800, 1000];
+    
+    cleanTimes.forEach(timeout => {return;
+        setTimeout(function() {
+            document.querySelectorAll('script').forEach(function(script) {
+                const content = script.textContent || '';
+                const src = script.src || '';
+                for (const kw of keywordsToBlock) {
+                    if (content.includes(kw)) {
+                        logBlock('script标签清理', kw, content, '已存在的内联脚本', script);
+                        script.remove();
+                        break;
+                    }
+                    if (src.includes(kw)) {
+                        logBlock('script标签清理', kw, src, '已存在的外部脚本', script);
+                        script.remove();
+                        break;
+                    }
                 }
-                if (src.includes(kw)) {
-                    logBlock('初始清理', kw, src, '已存在的外部脚本');
-                    script.remove();
-                    break;
+            });
+            
+            document.querySelectorAll('div[style*="display: none"]').forEach(function(div) {
+                const content = div.textContent || '';
+                for (const kw of keywordsToBlock) {
+                    if (content.includes(kw)) {
+                        logBlock('script标签清理', kw, content, '隐藏div', div);
+                        div.remove();
+                        break;
+                    }
                 }
-            }
+            });
+        }, timeout);
+    });
+	
+
+    // ===================额外：持续监控反F12脚本 ====================
+    const antiF12Keywords = [
+        'keyCode == 123',
+        'e.keyCode == 123',
+        'e.key === "F12"',
+        '.keyCode==123',
+        'disableDevTools',
+        'setInterval(function() {(debugger',
+		'setInterval(function(){(debugger',
+		'setInterval(function(){(debug',
+		'setInterval(function() {(debug'
+    ];
+	//const antiF12inter = ['setInterval'];
+	
+    
+    const antiF12Observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            mutation.addedNodes.forEach(function(node) {
+                if (node.nodeName === 'SCRIPT') {
+					const content = node.textContent || '';
+                    for (const kw of antiF12Keywords) {
+                        if (content.includes(kw) ) {
+                            console.log(`[脚本拦截器] 🔒 延迟检测到反F12脚本，已移除`,node);
+                            node.remove();
+                            break;
+                        }
+                    }
+                }
+            });
         });
-        
-        document.querySelectorAll('div[style*="display: none"]').forEach(function(div) {
-            const content = div.textContent || '';
-            for (const kw of keywordsToBlock) {
-                if (content.includes(kw)) {
-                    logBlock('初始清理', kw, content, '隐藏div');
-                    div.remove();
-                    break;
-                }
-            }
-        });
-    }, 0);
+    });
+    	
+    antiF12Observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+	
 
     console.log('[脚本拦截器] ✅ 所有拦截器部署完成，共 ' + keywordsToBlock.length + ' 个关键词');
-    console.log('[脚本拦截器] 📊 已部署策略: createElement, MutationObserver, appendChild, insertBefore, replaceChild, document.write, eval, Function, setTimeout, setInterval, Worker, SharedWorker, ServiceWorker, module, data URI, Cloudflare');
+	
 })();
