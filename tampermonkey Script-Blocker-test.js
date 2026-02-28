@@ -350,3 +350,4 @@
 
     console.log('[拦截器] ✅ 部署完成，关键词:', keywordsToBlock,performance.now());
     })();
+
