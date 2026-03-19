@@ -76,11 +76,11 @@
         }
         .column-left {
             flex: 1;
-            min-width: 400px;
+            min-width: 450px;
         }
         .column-right {
             flex: 1;
-            min-width: 400px;
+            min-width: 450px;
         }
         
         /* ==================== 编辑区域样式 ==================== */
@@ -318,7 +318,7 @@
             background: #d32f2f;
         }
         
-        /* ==================== 白名单样式 ==================== */
+        /* ==================== 白名单样式（优化版）==================== */
         .whitelist-section {
             background: white;
             border: 1px solid #e1e4e8;
@@ -348,43 +348,120 @@
         .badge.secondary {
             background: #fd7e14;
         }
+        
+        /* 白名单项目样式 */
         .whitelist-item {
             background: #f8f9fa;
             border: 1px solid #e1e4e8;
-            padding: 12px 15px;
+            padding: 10px 15px;
             margin-bottom: 8px;
             border-radius: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            min-height: 40px;
         }
         .whitelist-item:hover {
             border-color: #4CAF50;
         }
+        
+        /* 白名单规则文本 - 正常换行 */
         .whitelist-item .pattern {
             font-family: monospace;
             font-size: 14px;
             color: #2c3e50;
+            flex: 1;
+            word-break: break-all;
+            padding-right: 15px;
+            line-height: 1.4;
         }
+        
+        /* 白名单操作按钮容器 */
         .whitelist-item .actions {
             display: flex;
-            gap: 8px;
+            gap: 6px;
+            flex-shrink: 0;
         }
+        
+        /* 白名单按钮样式优化 - 强制不换行 */
         .whitelist-item .actions button {
             padding: 6px 12px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
+            font-weight: bold;
+            min-width: 52px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            transition: all 0.2s;
+            line-height: 1;
         }
-        .whitelist-item .edit {
+        
+        /* 编辑按钮 */
+        .whitelist-item .edit-whitelist {
             background: #2196F3;
             color: white;
         }
-        .whitelist-item .delete {
+        .whitelist-item .edit-whitelist:hover {
+            background: #1976D2;
+            transform: translateY(-1px);
+        }
+        
+        /* 删除按钮 */
+        .whitelist-item .delete-whitelist {
             background: #f44336;
             color: white;
         }
+        .whitelist-item .delete-whitelist:hover {
+            background: #d32f2f;
+            transform: translateY(-1px);
+        }
+        
+        /* 白名单编辑区域样式增强 - 只加大加高编辑区域，不改变示例框 */
+        #tab-whitelist .edit-section {
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 白名单类型选择框加大 */
+        #whitelistType {
+            height: 48px;
+            font-size: 16px;
+        }
+        
+        /* 白名单输入框加大 */
+        #whitelistPattern {
+            height: 48px;
+            font-size: 16px;
+        }
+        
+        /* 白名单编辑指示器样式 */
+        #whitelistEditingIndicator {
+            background: #e3f2fd;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border-left: 5px solid #2196F3;
+            font-weight: bold;
+            color: #1565c0;
+            font-size: 15px;
+        }
+        
+        /* 保持示例框原有大小不变 */
+        #tab-whitelist .example-box {
+            background: #e8f5e9;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 13px;
+            color: #2e7d32;
+        }
+        
         .whitelist-add {
             display: flex;
             gap: 10px;
@@ -428,6 +505,23 @@
             margin-top: 30px;
             color: #999;
             font-size: 12px;
+        }
+        .btn-export, .btn-import {
+            transition: all 0.3s;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-export:hover {
+            background: #1976D2 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+        }
+        .btn-import:hover {
+            background: #f57c00 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255, 152, 0, 0.3);
         }
     </style>
 </head>
@@ -491,7 +585,8 @@ zhihu.com"></textarea>
                             <textarea id="keywords" rows="5" placeholder="例如: 
 __CF$cv$params
 new Function(
-debugger"></textarea>
+debugger
+sponsorAdDiv"></textarea>
                         </div>
 
                         <div class="checkbox-group">
@@ -509,7 +604,13 @@ debugger"></textarea>
                 <!-- 右侧：现有规则列表 -->
                 <div class="column-right">
                     <div class="list-section">
-                        <h3>📋 现有规则列表</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3 style="margin: 0; border-left: 5px solid #4CAF50; padding-left: 15px;">📋 现有规则列表</h3>
+                            <div style="display: flex; gap: 10px;">
+                                <button id="exportRulesBtn" class="btn-export" style="background: #2196F3; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">📤 导出规则</button>
+                                <button id="importRulesBtn" class="btn-import" style="background: #FF9800; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">📥 导入规则</button>
+                            </div>
+                        </div>
                         <div class="rule-list" id="rulesList"></div>
                     </div>
                 </div>
@@ -520,37 +621,33 @@ debugger"></textarea>
         <div id="tab-whitelist" class="tab-content">
             <!-- 两栏布局 -->
             <div class="two-column">
-                <!-- 左侧：添加白名单 -->
+                <!-- 左侧：添加/编辑白名单（加大加高） -->
                 <div class="column-left">
                     <div class="edit-section">
-                        <h3>➕ 添加白名单规则</h3>
+                        <h3>✏️ 添加/编辑白名单</h3>
                         
-                        <!-- 全局白名单添加 -->
-                        <div class="whitelist-section">
-                            <h4>
-                                一级白名单
-                                <span class="badge global">均不拦截</span>
-                            </h4>
-                            <div class="whitelist-add">
-                                <input type="text" id="newGlobalPattern" 
-                                       placeholder="例如: *.bilibili.com 或 index.m3u8">
-                                <button id="addGlobalBtn">添加</button>
-                            </div>
+                        <!-- 编辑指示器 -->
+                        <div id="whitelistEditingIndicator" class="editing-indicator" style="display: none;">
+                            ✏️ 正在编辑白名单规则
                         </div>
                         
-                        <!-- 次级白名单添加 -->
-                        <div class="whitelist-section">
-                            <h4>
-                                次级白名单
-                                <span class="badge secondary">不拦截 createElement 和 Function</span>
-                            </h4>
-                            <div class="whitelist-add">
-                                <input type="text" id="newSecondaryPattern" 
-                                       placeholder="例如: bilibili.com 或 deepseek.com">
-                                <button id="addSecondaryBtn">添加</button>
-                            </div>
+                        <!-- 白名单类型选择 -->
+                        <div class="form-group">
+                            <label>📋 白名单类型</label>
+                            <select id="whitelistType">
+                                <option value="global">一级白名单（均不拦截）</option>
+                                <option value="secondary">次级白名单（不拦截 createElement 和 Function）</option>
+                            </select>
                         </div>
-                        
+
+                        <!-- 白名单规则输入（加大） -->
+                        <div class="form-group">
+                            <label>🔑 白名单规则</label>
+                            <input type="text" id="whitelistPattern" 
+                                   placeholder="例如: *.bilibili.com 或 index.m3u8">
+                        </div>
+
+                        <!-- 示例框保持原大小 -->
                         <div class="example-box">
                             <strong>📌 白名单说明：</strong><br>
                             • <code>*bilibili*</code> - 匹配所有含 bilibili 的网站<br>
@@ -558,10 +655,15 @@ debugger"></textarea>
                             • <code>localhost</code> - 匹配本地<br>
                             • 一级白名单优先级高于次级白名单
                         </div>
+
+                        <div class="button-group">
+                            <button id="saveWhitelistBtn" class="btn-save">💾 保存白名单</button>
+                            <button id="cancelWhitelistEditBtn" class="btn-cancel" style="display: none;">❌ 取消编辑</button>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- 右侧：白名单列表 -->
+                <!-- 右侧：白名单列表（按钮文字不换行，网址正常换行） -->
                 <div class="column-right">
                     <div class="list-section">
                         <h3>📋 白名单列表</h3>
@@ -582,8 +684,11 @@ debugger"></textarea>
             </div>
         </div>
         
+        <!-- 隐藏的文件输入框用于导入 -->
+        <input type="file" id="importFileInput" accept=".json,application/json" style="display: none;">
+
         <div class="footer">
-            ⚡ 规则和白名单保存后立即生效 | 🚫 一级白名单优先于次级白名单
+            ⚡ 规则和白名单保存后立即生效 | 🚫 一级白名单优先于次级白名单 | 💾 支持导入/导出规则（JSON格式）
         </div>
     </div>
     

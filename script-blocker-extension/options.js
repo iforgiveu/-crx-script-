@@ -216,8 +216,16 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.storage.local.set({ scriptBlockerRules: rules }, displayRules);
     }
 
-    // ==================== 白名单管理====================
-    
+    // ==================== 白名单管理（增强版）====================
+    const whitelistTypeSelect = document.getElementById('whitelistType');
+    const whitelistPatternInput = document.getElementById('whitelistPattern');
+    const saveWhitelistBtn = document.getElementById('saveWhitelistBtn');
+    const cancelWhitelistEditBtn = document.getElementById('cancelWhitelistEditBtn');
+    const whitelistEditingIndicator = document.getElementById('whitelistEditingIndicator');
+
+    let whitelistEditingIndex = -1;
+    let whitelistEditingType = null;
+
     // 加载白名单
     function loadWhitelists() {
         chrome.storage.local.get(['globalWhitelist', 'secondaryWhitelist'], function(result) {
@@ -234,12 +242,13 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         
         list.forEach((item, index) => {
+            const escapedItem = escapeHtml(item);
             html += `
                 <div class="whitelist-item" data-type="${type}" data-index="${index}">
-                    <span class="pattern">${escapeHtml(item)}</span>
+                    <span class="pattern">${escapedItem}</span>
                     <div class="actions">
-                        <button class="edit-whitelist" data-type="${type}" data-index="${index}" data-value="${escapeHtml(item)}">✏️</button>
-                        <button class="delete-whitelist" data-type="${type}" data-index="${index}">🗑️</button>
+                        <button class="edit-whitelist" data-type="${type}" data-index="${index}">编辑</button>
+                        <button class="delete-whitelist" data-type="${type}" data-index="${index}">删除</button>
                     </div>
                 </div>
             `;
@@ -255,7 +264,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 绑定白名单事件
     function bindWhitelistEvents() {
-        // 删除事件
         document.querySelectorAll('.delete-whitelist').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -265,56 +273,56 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // 编辑事件
         document.querySelectorAll('.edit-whitelist').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 const type = this.dataset.type;
                 const index = parseInt(this.dataset.index);
-                const oldValue = this.dataset.value;
-                editWhitelistItem(type, index, oldValue);
+                startWhitelistEdit(type, index);
             });
         });
     }
 
-    // 删除白名单项
-    function deleteWhitelistItem(type, index) {
-        if (!confirm('确定要删除这条白名单规则吗？')) return;
-        
+    function startWhitelistEdit(type, index) {
         const key = type === 'global' ? 'globalWhitelist' : 'secondaryWhitelist';
         
         chrome.storage.local.get([key], function(result) {
             const list = result[key] || [];
-            list.splice(index, 1);
+            const item = list[index];
             
-            chrome.storage.local.set({ [key]: list }, function() {
-                loadWhitelists();
-            });
+            if (!item) return;
+            
+            whitelistEditingIndex = index;
+            whitelistEditingType = type;
+            
+            whitelistTypeSelect.value = type;
+            whitelistPatternInput.value = item;
+            
+            whitelistEditingIndicator.style.display = 'block';
+            whitelistEditingIndicator.textContent = `✏️ 正在编辑 ${type === 'global' ? '一级' : '次级'} 白名单: ${item}`;
+            cancelWhitelistEditBtn.style.display = 'inline-block';
+            saveWhitelistBtn.textContent = '更新白名单';
+            
+            document.querySelector('.tab[data-tab="whitelist"]').click();
+            whitelistPatternInput.focus();
         });
     }
 
-    // 编辑白名单项
-    function editWhitelistItem(type, index, oldValue) {
-        const newValue = prompt('编辑白名单规则:', oldValue);
-        if (newValue === null || newValue.trim() === '') return;
+    function cancelWhitelistEdit() {
+        whitelistEditingIndex = -1;
+        whitelistEditingType = null;
         
-        const key = type === 'global' ? 'globalWhitelist' : 'secondaryWhitelist';
+        whitelistTypeSelect.value = 'global';
+        whitelistPatternInput.value = '';
         
-        chrome.storage.local.get([key], function(result) {
-            const list = result[key] || [];
-            list[index] = newValue.trim();
-            
-            chrome.storage.local.set({ [key]: list }, function() {
-                loadWhitelists();
-            });
-        });
+        whitelistEditingIndicator.style.display = 'none';
+        cancelWhitelistEditBtn.style.display = 'none';
+        saveWhitelistBtn.textContent = '保存白名单';
     }
 
-    // 添加白名单项
-    function addWhitelistItem(type) {
-        const inputId = type === 'global' ? 'newGlobalPattern' : 'newSecondaryPattern';
-        const input = document.getElementById(inputId);
-        const pattern = input.value.trim();
+    function saveWhitelist() {
+        const type = whitelistTypeSelect.value;
+        const pattern = whitelistPatternInput.value.trim();
         
         if (!pattern) {
             alert('请输入白名单规则');
@@ -326,21 +334,46 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.storage.local.get([key], function(result) {
             const list = result[key] || [];
             
-            if (list.includes(pattern)) {
+            const duplicateIndex = list.findIndex((item, idx) => 
+                item === pattern && !(whitelistEditingType === type && whitelistEditingIndex === idx)
+            );
+            
+            if (duplicateIndex !== -1) {
                 alert('该规则已存在');
                 return;
             }
             
-            list.push(pattern);
+            if (whitelistEditingIndex !== -1 && whitelistEditingType === type) {
+                list[whitelistEditingIndex] = pattern;
+            } else {
+                list.push(pattern);
+            }
             
             chrome.storage.local.set({ [key]: list }, function() {
-                input.value = '';
+                cancelWhitelistEdit();
                 loadWhitelists();
             });
         });
     }
 
-    // HTML转义
+    function deleteWhitelistItem(type, index) {
+        if (!confirm('确定要删除这条白名单规则吗？')) return;
+        
+        const key = type === 'global' ? 'globalWhitelist' : 'secondaryWhitelist';
+        
+        chrome.storage.local.get([key], function(result) {
+            const list = result[key] || [];
+            list.splice(index, 1);
+            
+            chrome.storage.local.set({ [key]: list }, function() {
+                if (whitelistEditingType === type && whitelistEditingIndex === index) {
+                    cancelWhitelistEdit();
+                }
+                loadWhitelists();
+            });
+        });
+    }
+
     function escapeHtml(text) {
         return String(text).replace(/&/g, '&amp;')
                           .replace(/</g, '&lt;')
@@ -349,27 +382,168 @@ document.addEventListener('DOMContentLoaded', function() {
                           .replace(/'/g, '&#039;');
     }
 
+    // ==================== 导入导出功能 ====================
+    function exportRules() {
+        if (rules.length === 0) {
+            if (!confirm('当前没有规则，确定要导出空文件吗？')) {
+                return;
+            }
+        }
+        
+        chrome.storage.local.get(['scriptBlockerRules', 'globalWhitelist', 'secondaryWhitelist'], function(result) {
+            const exportData = {
+                version: '1.1',
+                exportTime: new Date().toISOString(),
+                rules: result.scriptBlockerRules || [],
+                globalWhitelist: result.globalWhitelist || [],
+                secondaryWhitelist: result.secondaryWhitelist || []
+            };
+            
+            const jsonStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `script-blocker-rules-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert(`✅ 导出成功！共导出 ${exportData.rules.length} 条规则，${exportData.globalWhitelist.length} 条一级白名单，${exportData.secondaryWhitelist.length} 条次级白名单。`);
+        });
+    }
+
+    function importRules() {
+        const fileInput = document.getElementById('importFileInput');
+        fileInput.click();
+        
+        fileInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+                try {
+                    const importData = JSON.parse(event.target.result);
+                    
+                    if (!importData.rules && !importData.globalWhitelist && !importData.secondaryWhitelist) {
+                        throw new Error('无效的规则文件格式');
+                    }
+                    
+                    const ruleCount = importData.rules ? importData.rules.length : 0;
+                    const globalCount = importData.globalWhitelist ? importData.globalWhitelist.length : 0;
+                    const secondaryCount = importData.secondaryWhitelist ? importData.secondaryWhitelist.length : 0;
+                    
+                    const confirmMsg = `即将导入以下内容：\n` +
+                        `📋 拦截规则：${ruleCount} 条\n` +
+                        `🌍 一级白名单：${globalCount} 条\n` +
+                        `🔵 次级白名单：${secondaryCount} 条\n\n` +
+                        `⚠️ 注意：导入会覆盖当前所有规则和白名单！\n\n` +
+                        `确定要继续吗？`;
+                    
+                    if (!confirm(confirmMsg)) {
+                        fileInput.value = '';
+                        return;
+                    }
+                    
+                    const dataToSave = {};
+                    
+                    if (importData.rules) {
+                        dataToSave.scriptBlockerRules = importData.rules.map((rule, index) => {
+                            const name = rule.name || `导入规则 ${index + 1}`;
+                            const matchType = rule.matchType || 'simple';
+                            
+                            let sitePatterns = [];
+                            if (rule.sitePatterns && Array.isArray(rule.sitePatterns)) {
+                                sitePatterns = rule.sitePatterns;
+                            } else if (rule.sitePattern && typeof rule.sitePattern === 'string') {
+                                sitePatterns = [rule.sitePattern];
+                            } else if (rule.sitePatterns && typeof rule.sitePatterns === 'string') {
+                                sitePatterns = rule.sitePatterns.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+                            } else {
+                                sitePatterns = ['*'];
+                            }
+                            
+                            let keywords = [];
+                            if (rule.keywords && Array.isArray(rule.keywords)) {
+                                keywords = rule.keywords;
+                            } else if (rule.keywords && typeof rule.keywords === 'string') {
+                                keywords = rule.keywords.split('\n').map(k => k.trim()).filter(k => k.length > 0);
+                            } else {
+                                keywords = [];
+                            }
+                            
+                            const enabled = rule.enabled !== false;
+                            
+                            return {
+                                name: name,
+                                matchType: matchType,
+                                sitePatterns: sitePatterns,
+                                keywords: keywords,
+                                enabled: enabled
+                            };
+                        });
+                    }
+                    
+                    if (importData.globalWhitelist) {
+                        dataToSave.globalWhitelist = Array.isArray(importData.globalWhitelist) ? importData.globalWhitelist : [];
+                    }
+                    
+                    if (importData.secondaryWhitelist) {
+                        dataToSave.secondaryWhitelist = Array.isArray(importData.secondaryWhitelist) ? importData.secondaryWhitelist : [];
+                    }
+                    
+                    chrome.storage.local.set(dataToSave, function() {
+                        alert(`✅ 导入成功！\n\n` +
+                            `已导入 ${ruleCount} 条规则\n` +
+                            `${globalCount} 条一级白名单\n` +
+                            `${secondaryCount} 条次级白名单`);
+                        
+                        loadRules();
+                        loadWhitelists();
+                        fileInput.value = '';
+                    });
+                    
+                } catch (error) {
+                    alert('❌ 导入失败：文件格式错误\n\n' + error.message);
+                    console.error('导入错误:', error);
+                    fileInput.value = '';
+                }
+            };
+            
+            reader.readAsText(file);
+        };
+    }
+
     // ==================== 事件绑定 ====================
     saveRuleBtn.addEventListener('click', saveCurrentRule);
     cancelEditBtn.addEventListener('click', cancelEdit);
     
-    document.getElementById('addGlobalBtn').addEventListener('click', function() {
-        addWhitelistItem('global');
+    saveWhitelistBtn.addEventListener('click', saveWhitelist);
+    cancelWhitelistEditBtn.addEventListener('click', cancelWhitelistEdit);
+    
+    whitelistPatternInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveWhitelist();
+        }
     });
     
-    document.getElementById('addSecondaryBtn').addEventListener('click', function() {
-        addWhitelistItem('secondary');
+    whitelistTypeSelect.addEventListener('change', function() {
+        if (whitelistEditingIndex !== -1) {
+            if (!confirm('切换类型将取消当前编辑，确定吗？')) {
+                this.value = whitelistEditingType;
+                return;
+            }
+            cancelWhitelistEdit();
+        }
     });
     
-    document.getElementById('newGlobalPattern').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') addWhitelistItem('global');
-    });
-    
-    document.getElementById('newSecondaryPattern').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') addWhitelistItem('secondary');
-    });
+    document.getElementById('exportRulesBtn').addEventListener('click', exportRules);
+    document.getElementById('importRulesBtn').addEventListener('click', importRules);
 
-    // 初始化加载
     loadRules();
     loadWhitelists();
 });
