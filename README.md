@@ -14,10 +14,6 @@ Git Clone 代码。
 扩展管理页面 打开 "开发者模式"。
 点击 "加载已解压的扩展程序" 选中扩展文件夹即可。
 
-crx安装：
-Releases 右键另存为下载crx文件。
-扩展管理页面 打开 "开发者模式"。
-将crx文件拖入扩展程序页面即可。
 
 # 🔍界面
 <img width="849" height="568" alt="image" src="https://github.com/user-attachments/assets/aa53670b-cdd1-4484-9b24-ed90cc2b6383" />
