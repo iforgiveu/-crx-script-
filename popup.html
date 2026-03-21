@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            width: 350px;
+            padding: 15px;
+            font-family: Arial, sans-serif;
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 18px;
+        }
+        .rule-item {
+            background: #f5f5f5;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #4CAF50;
+        }
+        .rule-item.disabled {
+            border-left-color: #999;
+            opacity: 0.7;
+        }
+        .rule-url {
+            font-weight: bold;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+        .rule-keywords {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .rule-actions {
+            display: flex;
+            gap: 8px;
+        }
+        button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        .btn-edit {
+            background: #2196F3;
+            color: white;
+        }
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+        .btn-toggle {
+            background: #FF9800;
+            color: white;
+        }
+        .no-rules {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+        .current-url {
+            background: #e3f2fd;
+            padding: 8px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+        .status-active {
+            background: #4CAF50;
+            color: white;
+        }
+        .status-inactive {
+            background: #999;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h2>🔒 Script Blocker Pro</h2>
+    
+    <div id="currentUrl" class="current-url">当前网址: 加载中...</div>
+    
+    <button id="addRuleBtn" class="btn-primary">➕ 添加新规则</button>
+    
+    <div id="rulesContainer"></div>
+    
+    <div style="margin-top: 15px; text-align: center;">
+        <a href="#" id="openOptions">⚙️ 高级设置</a>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
