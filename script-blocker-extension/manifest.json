@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "scripting",
-    "tabs"
+    "tabs",
+	"webNavigation"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -40,7 +41,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["inject.js"],
+      "resources": ["inject.js","lockconsole.js","lockconsoleNOS.js"],
       "matches": ["<all_urls>"]
     }
   ],
